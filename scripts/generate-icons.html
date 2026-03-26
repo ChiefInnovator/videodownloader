@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Video Downloader — Icon Generator (Inventing Fire with AI)</title>
+  <style>
+    body { font-family: system-ui, sans-serif; background: #0f0f23; color: #e0e0e0; padding: 2rem; }
+    h1 { color: #FF6B35; }
+    h1 span { color: #6C5CE7; font-size: 0.7em; }
+    .icon-row { display: flex; gap: 2rem; align-items: flex-end; margin: 2rem 0; }
+    .icon-item { text-align: center; }
+    .icon-item canvas { border: 1px solid #333; border-radius: 8px; }
+    .icon-item p { margin: 0.5rem 0; font-size: 0.85rem; color: #999; }
+    button { background: #6C5CE7; color: #fff; border: none; padding: 0.75rem 1.5rem; border-radius: 6px; cursor: pointer; font-size: 1rem; margin-top: 1rem; }
+    button:hover { background: #5a4bd6; }
+    .instructions { background: #1a1a2e; padding: 1rem 1.5rem; border-radius: 8px; margin-top: 2rem; line-height: 1.6; }
+    code { background: #2a2a4e; padding: 2px 6px; border-radius: 3px; }
+  </style>
+</head>
+<body>
+  <h1>Inventing Fire with AI <span>— Video Downloader Icons</span></h1>
+  <p>Preview of the extension icons — fire-orange play icon with purple download arrow:</p>
+
+  <div class="icon-row" id="icon-row"></div>
+
+  <button id="download-all">Download All Icons</button>
+
+  <div class="instructions">
+    <p><strong>Instructions:</strong></p>
+    <ol>
+      <li>Click <strong>Download All Icons</strong> to save the three PNG files.</li>
+      <li>Move them into the <code>icons/</code> folder of the extension:
+        <br><code>icons/icon16.png</code>, <code>icons/icon48.png</code>, <code>icons/icon128.png</code></li>
+      <li>Reload the extension in <code>chrome://extensions</code>.</li>
+    </ol>
+  </div>
+
+  <script>
+    const SIZES = [16, 48, 128];
+    const FIRE_ORANGE = '#FF6B35';
+    const FIRE_YELLOW = '#FFB347';
+    const ACCENT = '#6C5CE7';
+    const BG_DARK = '#1a1a2e';
+    const LIGHT_PURPLE = '#a29bfe';
+
+    function drawIcon(ctx, size) {
+      const s = size;
+      const cx = s / 2;
+      const cy = s / 2;
+      const r = s * 0.45;
+
+      // ── Background circle with subtle gradient ──
+      const bgGrad = ctx.createRadialGradient(cx, cy * 0.8, 0, cx, cy, r);
+      bgGrad.addColorStop(0, '#1e1e3a');
+      bgGrad.addColorStop(1, BG_DARK);
+      ctx.fillStyle = bgGrad;
+      ctx.beginPath();
+      ctx.arc(cx, cy, r, 0, Math.PI * 2);
+      ctx.fill();
+
+      // ── Circle border — fire gradient ──
+      const borderGrad = ctx.createLinearGradient(0, 0, s, s);
+      borderGrad.addColorStop(0, FIRE_ORANGE);
+      borderGrad.addColorStop(0.5, FIRE_YELLOW);
+      borderGrad.addColorStop(1, ACCENT);
+      ctx.strokeStyle = borderGrad;
+      ctx.lineWidth = Math.max(1.5, s * 0.055);
+      ctx.beginPath();
+      ctx.arc(cx, cy, r, 0, Math.PI * 2);
+      ctx.stroke();
+
+      // ── Play triangle (fire orange) ──
+      const playGrad = ctx.createLinearGradient(cx - s * 0.15, cy - s * 0.15, cx + s * 0.15, cy + s * 0.15);
+      playGrad.addColorStop(0, FIRE_ORANGE);
+      playGrad.addColorStop(1, FIRE_YELLOW);
+      ctx.fillStyle = playGrad;
+
+      const px = cx - s * 0.03;
+      const py = cy - s * 0.02;
+      const ph = s * 0.3;
+      const pw = s * 0.26;
+      ctx.beginPath();
+      ctx.moveTo(px - pw * 0.35, py - ph / 2);
+      ctx.lineTo(px + pw * 0.65, py);
+      ctx.lineTo(px - pw * 0.35, py + ph / 2);
+      ctx.closePath();
+      ctx.fill();
+
+      // ── Download arrow (purple accent, bottom-right) ──
+      const ax = cx + s * 0.16;
+      const ay = cy + s * 0.2;
+      const aw = Math.max(1.2, s * 0.055);
+      const aLen = s * 0.14;
+
+      ctx.strokeStyle = ACCENT;
+      ctx.lineWidth = aw;
+      ctx.lineCap = 'round';
+      ctx.lineJoin = 'round';
+
+      // Vertical stem
+      ctx.beginPath();
+      ctx.moveTo(ax, ay - aLen);
+      ctx.lineTo(ax, ay);
+      ctx.stroke();
+
+      // Arrowhead
+      const headSize = s * 0.065;
+      ctx.beginPath();
+      ctx.moveTo(ax - headSize, ay - headSize);
+      ctx.lineTo(ax, ay);
+      ctx.lineTo(ax + headSize, ay - headSize);
+      ctx.stroke();
+
+      // Base line
+      const baseW = s * 0.085;
+      ctx.beginPath();
+      ctx.moveTo(ax - baseW, ay + Math.max(1, s * 0.03));
+      ctx.lineTo(ax + baseW, ay + Math.max(1, s * 0.03));
+      ctx.stroke();
+
+      // ── Tiny fire flicker at top-left (only on larger sizes) ──
+      if (s >= 48) {
+        const fx = cx - s * 0.22;
+        const fy = cy - s * 0.2;
+        const fSize = s * 0.08;
+
+        ctx.fillStyle = FIRE_ORANGE;
+        ctx.beginPath();
+        ctx.moveTo(fx, fy + fSize);
+        ctx.quadraticCurveTo(fx - fSize * 0.6, fy, fx, fy - fSize);
+        ctx.quadraticCurveTo(fx + fSize * 0.6, fy, fx, fy + fSize);
+        ctx.fill();
+
+        if (s >= 128) {
+          // Inner flame
+          ctx.fillStyle = FIRE_YELLOW;
+          const ifs = fSize * 0.5;
+          ctx.beginPath();
+          ctx.moveTo(fx, fy + ifs);
+          ctx.quadraticCurveTo(fx - ifs * 0.5, fy + ifs * 0.2, fx, fy - ifs * 0.3);
+          ctx.quadraticCurveTo(fx + ifs * 0.5, fy + ifs * 0.2, fx, fy + ifs);
+          ctx.fill();
+        }
+      }
+    }
+
+    // Render previews
+    const row = document.getElementById('icon-row');
+    const canvases = {};
+
+    SIZES.forEach(size => {
+      const item = document.createElement('div');
+      item.className = 'icon-item';
+
+      const canvas = document.createElement('canvas');
+      canvas.width = size;
+      canvas.height = size;
+      canvas.style.width = Math.max(size, 64) + 'px';
+      canvas.style.height = Math.max(size, 64) + 'px';
+      if (size < 48) canvas.style.imageRendering = 'pixelated';
+
+      const ctx = canvas.getContext('2d');
+      drawIcon(ctx, size);
+
+      canvases[size] = canvas;
+
+      const label = document.createElement('p');
+      label.textContent = `${size}\u00d7${size}`;
+
+      item.appendChild(canvas);
+      item.appendChild(label);
+      row.appendChild(item);
+    });
+
+    // Download
+    document.getElementById('download-all').addEventListener('click', () => {
+      SIZES.forEach(size => {
+        const link = document.createElement('a');
+        link.download = `icon${size}.png`;
+        link.href = canvases[size].toDataURL('image/png');
+        link.click();
+      });
+    });
+  </script>
+</body>
+</html>

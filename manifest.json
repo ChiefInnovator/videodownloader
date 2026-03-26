@@ -1,0 +1,49 @@
+{
+  "manifest_version": 3,
+  "name": "Video Downloader",
+  "version": "2.1.0",
+  "description": "Detect, extract, and download video content from web pages for offline viewing. By Rich Crane — Inventing Fire with AI.",
+  "author": "Rich Crane",
+  "homepage_url": "https://github.com/chiefinnovator",
+  "permissions": [
+    "activeTab",
+    "cookies",
+    "downloads",
+    "scripting",
+    "storage",
+    "webRequest",
+    "webNavigation"
+  ],
+  "host_permissions": [
+    "<all_urls>"
+  ],
+  "background": {
+    "service_worker": "src/background/service-worker.js",
+    "type": "module"
+  },
+  "content_scripts": [
+    {
+      "matches": ["<all_urls>"],
+      "js": ["src/content/detector.js"],
+      "run_at": "document_idle",
+      "all_frames": true
+    }
+  ],
+  "action": {
+    "default_popup": "src/popup/popup.html",
+    "default_icon": {
+      "16": "icons/icon16.png",
+      "48": "icons/icon48.png",
+      "128": "icons/icon128.png"
+    }
+  },
+  "options_ui": {
+    "page": "src/options/options.html",
+    "open_in_tab": false
+  },
+  "icons": {
+    "16": "icons/icon16.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  }
+}
