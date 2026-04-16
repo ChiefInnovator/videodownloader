@@ -1,0 +1,134 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="630" viewBox="0 0 1200 630">
+  <defs>
+    <radialGradient id="bgGlow" cx="12%" cy="-5%" r="75%">
+      <stop offset="0%" stop-color="#ff6a1a" stop-opacity="0.45"/>
+      <stop offset="45%" stop-color="#c7430c" stop-opacity="0.18"/>
+      <stop offset="100%" stop-color="#0b0907" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="bgGlow2" cx="95%" cy="110%" r="60%">
+      <stop offset="0%" stop-color="#c7430c" stop-opacity="0.3"/>
+      <stop offset="100%" stop-color="#0b0907" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="ember" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#ff6a1a"/>
+      <stop offset="100%" stop-color="#c7430c"/>
+    </linearGradient>
+    <linearGradient id="emberText" x1="0%" y1="0%" x2="100%" y2="50%">
+      <stop offset="0%" stop-color="#ffb347"/>
+      <stop offset="60%" stop-color="#ff6a1a"/>
+      <stop offset="100%" stop-color="#c7430c"/>
+    </linearGradient>
+    <pattern id="scanlines" width="4" height="4" patternUnits="userSpaceOnUse">
+      <rect width="4" height="4" fill="transparent"/>
+      <rect width="4" height="1" y="2" fill="#000000" fill-opacity="0.18"/>
+    </pattern>
+    <filter id="softGlow" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur stdDeviation="8"/>
+    </filter>
+  </defs>
+
+  <!-- Base background -->
+  <rect width="1200" height="630" fill="#0b0907"/>
+
+  <!-- Ember glows -->
+  <rect width="1200" height="630" fill="url(#bgGlow)"/>
+  <rect width="1200" height="630" fill="url(#bgGlow2)"/>
+
+  <!-- Subtle ember halo behind the title (soft, diffused) -->
+  <ellipse cx="430" cy="345" rx="320" ry="110" fill="#ff6a1a" fill-opacity="0.12" filter="url(#softGlow)"/>
+
+  <!-- Scanline overlay -->
+  <rect width="1200" height="630" fill="url(#scanlines)"/>
+
+  <!-- Top strip: play mark + product name + version -->
+  <g transform="translate(72, 72)">
+    <rect width="56" height="56" rx="12" fill="url(#ember)"/>
+    <polygon points="20,16 44,28 20,40" fill="#0b0907"/>
+    <text x="80" y="24" font-family="ui-monospace, 'SF Mono', 'JetBrains Mono', Menlo, monospace"
+          font-size="13" font-weight="600" letter-spacing="3.6" fill="#f2ece3">VIDEO DOWNLOADER</text>
+    <text x="80" y="48" font-family="ui-monospace, 'SF Mono', 'JetBrains Mono', Menlo, monospace"
+          font-size="12" letter-spacing="2.4" fill="#7e7567">v2.1 · CHROME · MANIFEST V3</text>
+  </g>
+
+  <!-- Free / no-tracking pill top-right -->
+  <g transform="translate(908, 78)">
+    <rect width="220" height="34" rx="17" fill="#0b0907" fill-opacity="0.7" stroke="#ff6a1a" stroke-opacity="0.35"/>
+    <circle cx="18" cy="17" r="4" fill="#ff6a1a"/>
+    <text x="34" y="22" font-family="ui-monospace, 'SF Mono', 'JetBrains Mono', Menlo, monospace"
+          font-size="11" font-weight="500" letter-spacing="2.4" fill="#ffb347">FREE · NO TRACKING</text>
+  </g>
+
+  <!-- Headline -->
+  <g transform="translate(72, 260)">
+    <text font-family="'Fraunces', 'Hoefler Text', 'Palatino', Georgia, serif"
+          font-size="78" font-weight="400" fill="#f2ece3" letter-spacing="-1.8">
+      <tspan x="0" y="0">A video downloader that</tspan>
+      <tspan x="0" y="94" font-style="italic" font-weight="300" fill="url(#emberText)">doesn't watch</tspan>
+      <tspan font-style="italic" font-weight="300" fill="#f2ece3"> you back.</tspan>
+    </text>
+  </g>
+
+  <!-- Waveform visualization (right side, decorative) -->
+  <g transform="translate(920, 280)" opacity="0.85">
+    <rect x="0.00" y="35.00" width="3" height="70.00" rx="1.5" fill="url(#ember)" opacity="0.75"/>
+    <rect x="6.35" y="6.45" width="3" height="127.09" rx="1.5" fill="url(#ember)" opacity="0.95"/>
+    <rect x="12.71" y="-7.69" width="3" height="155.39" rx="1.5" fill="url(#ember)" opacity="1.05"/>
+    <rect x="19.06" y="-2.89" width="3" height="145.79" rx="1.5" fill="url(#ember)" opacity="1.02"/>
+    <rect x="25.42" y="13.03" width="3" height="113.93" rx="1.5" fill="url(#ember)" opacity="0.91"/>
+    <rect x="31.77" y="26.49" width="3" height="87.01" rx="1.5" fill="url(#ember)" opacity="0.81"/>
+    <rect x="38.13" y="28.69" width="3" height="82.61" rx="1.5" fill="url(#ember)" opacity="0.80"/>
+    <rect x="44.48" y="22.12" width="3" height="95.76" rx="1.5" fill="url(#ember)" opacity="0.84"/>
+    <rect x="50.84" y="18.01" width="3" height="103.98" rx="1.5" fill="url(#ember)" opacity="0.87"/>
+    <rect x="57.19" y="26.84" width="3" height="86.31" rx="1.5" fill="url(#ember)" opacity="0.81"/>
+    <rect x="63.55" y="49.24" width="3" height="41.52" rx="1.5" fill="url(#ember)" opacity="0.65"/>
+    <rect x="69.90" y="65.64" width="3" height="8.73" rx="1.5" fill="url(#ember)" opacity="0.53"/>
+    <rect x="76.26" y="52.76" width="3" height="34.48" rx="1.5" fill="url(#ember)" opacity="0.62"/>
+    <rect x="82.61" y="60.48" width="3" height="19.05" rx="1.5" fill="url(#ember)" opacity="0.57"/>
+    <rect x="88.97" y="55.63" width="3" height="28.75" rx="1.5" fill="url(#ember)" opacity="0.60"/>
+    <rect x="95.32" y="29.59" width="3" height="80.81" rx="1.5" fill="url(#ember)" opacity="0.79"/>
+    <rect x="101.68" y="15.03" width="3" height="109.94" rx="1.5" fill="url(#ember)" opacity="0.89"/>
+    <rect x="108.03" y="15.68" width="3" height="108.65" rx="1.5" fill="url(#ember)" opacity="0.89"/>
+    <rect x="114.39" y="23.70" width="3" height="92.60" rx="1.5" fill="url(#ember)" opacity="0.83"/>
+    <rect x="120.74" y="26.75" width="3" height="86.50" rx="1.5" fill="url(#ember)" opacity="0.81"/>
+    <rect x="127.10" y="18.35" width="3" height="103.30" rx="1.5" fill="url(#ember)" opacity="0.87"/>
+    <rect x="133.45" y="3.43" width="3" height="133.14" rx="1.5" fill="url(#ember)" opacity="0.98"/>
+    <rect x="139.81" y="-5.18" width="3" height="150.36" rx="1.5" fill="url(#ember)" opacity="1.04"/>
+    <rect x="146.16" y="3.24" width="3" height="133.51" rx="1.5" fill="url(#ember)" opacity="0.98"/>
+    <rect x="152.52" y="28.51" width="3" height="82.98" rx="1.5" fill="url(#ember)" opacity="0.80"/>
+    <rect x="158.87" y="58.72" width="3" height="22.56" rx="1.5" fill="url(#ember)" opacity="0.58"/>
+    <rect x="165.23" y="61.79" width="3" height="16.42" rx="1.5" fill="url(#ember)" opacity="0.56"/>
+    <rect x="171.58" y="61.64" width="3" height="16.71" rx="1.5" fill="url(#ember)" opacity="0.56"/>
+    <rect x="177.94" y="63.21" width="3" height="13.57" rx="1.5" fill="url(#ember)" opacity="0.55"/>
+    <rect x="184.29" y="45.78" width="3" height="48.44" rx="1.5" fill="url(#ember)" opacity="0.67"/>
+    <rect x="190.65" y="37.87" width="3" height="64.26" rx="1.5" fill="url(#ember)" opacity="0.73"/>
+    <rect x="197.00" y="41.35" width="3" height="57.29" rx="1.5" fill="url(#ember)" opacity="0.70"/>
+  </g>
+
+  <!-- Bottom divider line -->
+  <line x1="72" y1="445" x2="1128" y2="445" stroke="#f2ece3" stroke-opacity="0.08"/>
+
+  <!-- Tech specs -->
+  <text x="72" y="485" font-family="ui-monospace, 'SF Mono', 'JetBrains Mono', Menlo, monospace"
+        font-size="14" font-weight="500" letter-spacing="2.4" fill="#ffb347">
+    HLS · DASH · AES-128 · IFRAME EMBEDS
+  </text>
+
+  <!-- Byline -->
+  <text x="72" y="530" font-family="'Fraunces', 'Hoefler Text', 'Palatino', Georgia, serif"
+        font-size="20" fill="#c9bfb0">
+    <tspan font-style="italic" font-weight="400">by Rich Crane</tspan>
+    <tspan fill="#7e7567"> · Microsoft MVP · MILL5 · </tspan>
+    <tspan fill="#c9bfb0">Inventing Fire with AI</tspan>
+  </text>
+
+  <!-- URL label (right, aligned with byline) -->
+  <text x="1128" y="530" text-anchor="end"
+        font-family="ui-monospace, 'SF Mono', 'JetBrains Mono', Menlo, monospace"
+        font-size="13" letter-spacing="0.6" fill="#7e7567">
+    chiefinnovator.github.io/videodownloader
+  </text>
+
+  <!-- Fine ember border accent on the left edge -->
+  <rect x="0" y="0" width="4" height="630" fill="url(#ember)" opacity="0.65"/>
+</svg>
