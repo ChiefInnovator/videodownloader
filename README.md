@@ -1,8 +1,10 @@
 # Video Downloader — Chrome Extension
 
-**Inventing Fire with AI** — by Rich Crane
+**A free video downloader that doesn't track what you are doing.**
 
-Detect, extract, and download video content from web pages for offline viewing — including cross-origin iframe embeds and AES-128 encrypted HLS/DASH streams.
+Built by **Rich Crane** — Microsoft MVP, Founder & Chief AI Officer at MILL5. Part of the **Inventing Fire with AI** initiative.
+
+Detect, extract, and download video content from web pages for offline viewing — including cross-origin iframe embeds and AES-128 encrypted HLS/DASH streams. No analytics. No telemetry. No accounts. Nothing leaves your browser except the segment fetches required to download the video you selected.
 
 ## Features
 
@@ -109,13 +111,17 @@ See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for full technical details, det
 
 ## Author
 
-**Rich Crane** — Founder & Chief AI Officer at MILL5
+**Richard Crane** is a **Microsoft Most Valuable Professional (MVP)** and the founder and Chief AI Officer of **MILL5**, a software consultancy specializing in cloud, AI, and developer tooling. He hosts the *Inventing Fire with AI* podcast.
 
-Part of the **Inventing Fire with AI** initiative.
-
-- Website: [inventingfirewith.ai](https://www.inventingfirewith.ai)
+- MILL5: [mill5.com](https://mill5.com)
+- Inventing Fire with AI: [inventingfirewith.ai](https://www.inventingfirewith.ai)
+- Microsoft MVP profile: [Richard Crane on Microsoft MVP](https://mvp.microsoft.com/en-US/MVP/profile/10ce0bc0-7536-43f6-b28c-e9601a4a0d0d)
 - YouTube: [@InventingFirewithAI](https://www.youtube.com/@InventingFirewithAI)
 - Apple Podcasts: [Inventing Fire with AI](https://podcasts.apple.com/us/podcast/inventing-fire-with-ai/id1814411467)
-- GitHub: [@chiefinnovator](https://github.com/chiefinnovator)
+- GitHub: [@ChiefInnovator](https://github.com/ChiefInnovator)
+- Marketing site: [chiefinnovator.github.io/videodownloader](https://chiefinnovator.github.io/videodownloader/)
+- Contact: <rich@mill5.com>
 
-Copyright 2026 Richard Crane. All rights reserved.
+## License
+
+© 2026 Richard Crane. All rights reserved.

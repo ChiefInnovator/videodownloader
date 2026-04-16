@@ -1,0 +1,68 @@
+# Video Downloader
+
+> A free Chrome extension that detects and downloads video content from web pages — HTML5 video, HLS (.m3u8), DASH (.mpd), AES‑128 encrypted streams, and cross‑origin iframe embeds from platforms like Medius, Vimeo, Mux, Wistia, and Brightcove. Built for offline viewing, archival, research, accessibility workflows, and compliance. Manifest V3, runs entirely in your browser, no analytics, no telemetry, no tracking.
+
+The core motivation: a free video downloader that doesn't track what you are doing. No accounts, no analytics, no telemetry, no third‑party network calls. All manifest parsing, segment fetching, AES‑128 decryption, and file assembly happen locally in the user's browser using native Web APIs (fetch, crypto.subtle, chrome.downloads).
+
+Video Downloader is developed by Richard Crane (Microsoft MVP, founder and Chief AI Officer of MILL5, host of the *Inventing Fire with AI* podcast). It is part of the Inventing Fire with AI initiative. The extension respects content protection — it detects Widevine, PlayReady, and FairPlay DRM and warns the user rather than attempting to circumvent it.
+
+The current release is v2.1.0. It is distributed as a Chrome Manifest V3 extension via GitHub Releases (the Chrome Web Store listing is in review).
+
+## Project
+
+- [Landing page](https://chiefinnovator.github.io/videodownloader/): Marketing site with features, pipeline diagram, install instructions, and FAQ.
+- [GitHub repository](https://github.com/ChiefInnovator/videodownloader): Source code, issue tracker, and release notes.
+- [Releases](https://github.com/ChiefInnovator/videodownloader/releases): Signed zip downloads of every version.
+
+## Documentation
+
+- [README](https://github.com/ChiefInnovator/videodownloader/blob/main/README.md): Feature overview, project structure, local testing, Chrome Web Store packaging, known limitations.
+- [Architecture](https://github.com/ChiefInnovator/videodownloader/blob/main/docs/ARCHITECTURE.md): Component diagram and responsibilities — content script, service worker, popup UI, options page, iframe resolver, HLS parser, DASH parser, AES decryption, segment downloader.
+
+## Features
+
+- Automatic detection of HTML5 `<video>` elements, `<source>` children, `og:video` meta tags, JSON‑LD VideoObject entries, and `data-*` attributes.
+- **HLS (.m3u8) support** — master and media playlist parsing, variant selection, segment enumeration.
+- **DASH (.mpd) support** — adaptation set and representation parsing, segment template and timeline support.
+- **AES‑128 CBC decryption** — fetches `#EXT-X-KEY` URIs, reads IVs, decrypts each segment via the browser's Web Crypto API (`crypto.subtle`). No WASM, no ffmpeg, no server.
+- **Cross‑origin iframe resolution** — classifies embeds by domain (Medius, Vimeo, Mux, Wistia, Brightcove) and path keywords (`/embed/`, `/video/`, `/player/`, `/video-aes/`), then resolves manifests via captured network traffic and embed‑page parsing.
+- **Authentication forwarding** — extracts JWT tokens from iframe URL query parameters and pulls session cookies via `chrome.cookies.getAll()`. Applied to all manifest, segment, and key requests.
+- **DRM detection** — surfaces Widevine, PlayReady, and FairPlay markers in manifests and clearly warns the user. Does not attempt to bypass DRM.
+- **Segment‑level progress** — live readout of segment count, percent complete, throughput, and ETA. Pause, resume, and cancel at any time.
+- **SPA compatibility** — MutationObserver re‑scans the DOM when new video elements or iframes appear (React, Vue, Svelte, lazy‑loaded pages).
+- **Quality selection** — picks the preferred variant for multi‑bitrate HLS and multi‑representation DASH.
+- **Configurable options** — default format, default quality, download location.
+- **Privacy** — no analytics, no telemetry, no third‑party requests. Nothing leaves the browser except the segment fetches required to download the video you selected.
+
+## Intended use cases
+
+- **Journalists and researchers** — archiving primary‑source video before it disappears.
+- **Educators and learners** — offline access to training sessions, lectures, and conference recordings.
+- **Creators and production teams** — reclaiming streams and embeds as editable source files.
+- **Compliance and legal** — evidence preservation of webinars, depositions, and public hearings.
+- **Accessibility workflows** — local transcription, captioning, and translation with tools like Whisper and ffmpeg.
+- **Engineers and QA** — reproducing playback bugs against real HLS and DASH sources.
+
+## Ethics
+
+Video Downloader is intended for content the user is authorized to access and has a reason to keep. DRM‑protected content is detected and respected, not circumvented. Users are expected to honor copyright, platform terms of service, and the rights of creators.
+
+## Browser support
+
+Any Chromium‑based browser with Manifest V3 support: Google Chrome 114+, Microsoft Edge 114+, Brave, Arc, Vivaldi, Opera. Firefox is not currently supported.
+
+## Author
+
+Richard Crane is a **Microsoft Most Valuable Professional (MVP)** and the founder and Chief AI Officer of **MILL5**, a software consultancy specializing in cloud, AI, and developer tooling. He hosts the *Inventing Fire with AI* podcast.
+
+- MILL5: https://mill5.com
+- Inventing Fire with AI: https://www.inventingfirewith.ai
+- YouTube: https://www.youtube.com/@InventingFirewithAI
+- Apple Podcasts: https://podcasts.apple.com/us/podcast/inventing-fire-with-ai/id1814411467
+- Microsoft MVP profile: https://mvp.microsoft.com/en-US/MVP/profile/10ce0bc0-7536-43f6-b28c-e9601a4a0d0d
+- GitHub: https://github.com/ChiefInnovator
+- Contact: rich@mill5.com
+
+## License
+
+© 2026 Richard Crane. All rights reserved.
