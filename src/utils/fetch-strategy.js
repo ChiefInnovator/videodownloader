@@ -9,6 +9,10 @@
  *   3. sw-cookies        — fetch() in service worker with manually-built Cookie header
  *   4. direct-fetch      — plain fetch() with credentials: include from service worker
  *
+ * Segments try direct-fetch first (see SEGMENT_ORDER): CDN segment URLs are
+ * usually signed, and a service-worker fetch avoids copying every byte
+ * across worlds.
+ *
  * Inventing Fire with AI — by Rich Crane
  */
 
@@ -59,12 +63,15 @@ const STRATEGIES = [
           try {
             const res = await fetch(fetchUrl, { credentials: 'include' });
             if (!res.ok) throw new Error(`${res.status} ${res.statusText}`);
-            const buf = await res.arrayBuffer();
-            const bytes = new Uint8Array(buf);
-            // Convert to regular array for serialization across worlds
-            const arr = [];
-            for (let i = 0; i < bytes.length; i++) arr.push(bytes[i]);
-            return { data: arr };
+            const bytes = new Uint8Array(await res.arrayBuffer());
+            // Results are JSON-serialized, so send base64 — a per-byte
+            // number array is ~4x larger and far slower to build and parse.
+            if (typeof bytes.toBase64 === 'function') return { b64: bytes.toBase64() };
+            let bin = '';
+            for (let i = 0; i < bytes.length; i += 0x8000) {
+              bin += String.fromCharCode.apply(null, bytes.subarray(i, i + 0x8000));
+            }
+            return { b64: btoa(bin) };
           } catch (err) {
             return { error: err.message };
           }
@@ -75,8 +82,8 @@ const STRATEGIES = [
       const result = results?.[0]?.result;
       if (!result) throw new Error('No result from page context');
       if (result.error) throw new Error(result.error);
-      if (!result.data?.length) throw new Error('Empty response');
-      return new Uint8Array(result.data).buffer;
+      if (!result.b64) throw new Error('Empty response');
+      return base64ToArrayBuffer(result.b64);
     },
   },
   {
@@ -89,6 +96,7 @@ const STRATEGIES = [
         url,
       }, ctx.frameId != null ? { frameId: ctx.frameId } : undefined);
       if (response?.error) throw new Error(response.error);
+      if (response?.b64) return base64ToArrayBuffer(response.b64);
       if (!response?.data) throw new Error('Empty response');
       return new Uint8Array(response.data).buffer;
     },
@@ -123,6 +131,16 @@ const STRATEGIES = [
     },
   },
 ];
+
+// Segment fetches are the bulk of a download. Try the zero-copy service
+// worker fetch first; if the CDN rejects it, the in-page strategies follow
+// and the winner is cached per domain like any other operation.
+const SEGMENT_ORDER = ['direct-fetch', 'page-main-world', 'content-script', 'sw-cookies'];
+
+function strategiesFor(operationType) {
+  if (operationType !== 'segment') return STRATEGIES;
+  return SEGMENT_ORDER.map(name => STRATEGIES.find(s => s.name === name));
+}
 
 // ── Domain strategy cache ───────────────────────────────────────────
 // Key: "domain:operationType" → strategy name
@@ -180,7 +198,7 @@ export async function fetchWithStrategy(url, operationType, context) {
 
   // Full chain — try each strategy in order
   const errors = [];
-  for (const strategy of STRATEGIES) {
+  for (const strategy of strategiesFor(operationType)) {
     if (!strategy.available(context)) continue;
 
     try {
@@ -247,6 +265,14 @@ export async function probe(sampleUrl, operationType, context) {
 }
 
 // ── Internal helpers ────────────────────────────────────────────────
+
+function base64ToArrayBuffer(b64) {
+  if (typeof Uint8Array.fromBase64 === 'function') return Uint8Array.fromBase64(b64).buffer;
+  const bin = atob(b64);
+  const bytes = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+  return bytes.buffer;
+}
 
 function withTimeout(promise, ms) {
   return new Promise((resolve, reject) => {

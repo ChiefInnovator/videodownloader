@@ -198,7 +198,7 @@ function updateBadge(tabId) {
 /** @type {Map<number, { downloadId: number, url: string, tabId: number }>} */
 const activeDownloads = new Map();
 
-async function startSimpleDownload(url, filename, tabId) {
+async function startSimpleDownload(url, filename, tabId, { keepExtension = false } = {}) {
   const settings = await chrome.storage.sync.get({
     defaultFormat: '',
     downloadPath: '',
@@ -212,7 +212,8 @@ async function startSimpleDownload(url, filename, tabId) {
       : filename;
   }
 
-  if (settings.defaultFormat && filename) {
+  // Documents (e.g. slide PDFs) must keep their own extension.
+  if (settings.defaultFormat && filename && !keepExtension) {
     const ext = settings.defaultFormat;
     opts.filename = opts.filename.replace(/\.\w+$/, `.${ext}`);
   }
@@ -583,7 +584,8 @@ async function handleMessage(msg, _sender) {
     case 'download': {
       const ext = extFromUrl(msg.url) || extFromMime(msg.mime) || 'mp4';
       const filename = msg.filename || filenameFromUrl(msg.url, ext);
-      const downloadId = await startSimpleDownload(msg.url, filename, msg.tabId);
+      const downloadId = await startSimpleDownload(msg.url, filename, msg.tabId,
+        { keepExtension: !!msg.keepExtension });
       return { downloadId };
     }
 

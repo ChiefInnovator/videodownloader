@@ -20,7 +20,7 @@ import {
 
 const MAX_RETRIES = 3;
 const BASE_RETRY_DELAY_MS = 1000;
-const MAX_CONCURRENT = 4;
+const MAX_CONCURRENT = 6;
 
 // ── Active jobs registry ────────────────────────────────────────────
 
@@ -183,27 +183,28 @@ async function runPipeline(
 }
 
 async function downloadAllSegments(segments, buffers, keyFetcher, segmentFetcher, keyCache, signal, job) {
+  // Worker pool: each worker pulls the next segment as soon as it finishes,
+  // so one slow segment no longer stalls the rest of a fixed batch.
   let cursor = 0;
+  let failed = false;
 
-  while (cursor < segments.length) {
-    if (signal.aborted) throw new DOMException('Download paused', 'AbortError');
-
-    const batch = [];
-    while (batch.length < MAX_CONCURRENT && cursor < segments.length) {
-      if (!buffers[cursor]) {
-        batch.push({ index: cursor, spec: segments[cursor] });
+  const worker = async () => {
+    while (!failed) {
+      if (signal.aborted) throw new DOMException('Download paused', 'AbortError');
+      const index = cursor++;
+      if (index >= segments.length) return;
+      if (buffers[index]) continue;
+      try {
+        await downloadOneSegment(index, segments[index], buffers, keyFetcher, segmentFetcher, keyCache, signal, job);
+      } catch (err) {
+        failed = true;
+        throw err;
       }
-      cursor++;
     }
+  };
 
-    if (batch.length === 0) continue;
-
-    await Promise.all(
-      batch.map(({ index, spec }) =>
-        downloadOneSegment(index, spec, buffers, keyFetcher, segmentFetcher, keyCache, signal, job)
-      )
-    );
-  }
+  const workers = Math.min(MAX_CONCURRENT, segments.length);
+  await Promise.all(Array.from({ length: workers }, worker));
 }
 
 async function downloadOneSegment(index, spec, buffers, keyFetcher, segmentFetcher, keyCache, signal, job) {

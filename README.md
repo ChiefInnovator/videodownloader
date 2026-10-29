@@ -20,6 +20,8 @@ Detect, extract, and download video content from web pages for offline viewing �
 - Clean dark-themed popup UI with video thumbnails and metadata
 - Configurable default format, quality, and download location
 - SPA-compatible via MutationObserver for dynamically loaded content
+- **Session-titled files** — names downloads from the page's session/player title (e.g. `GH-300 Tech Prep.mp4`) instead of `stream.mpd`
+- **Slides download** — detects slide-deck links (PDF/PPT/Key) in any frame, lists them, and downloads them alongside the video
 
 ## Project Structure
 
@@ -41,7 +43,8 @@ videodownloader/
 │       ├── dash-parser.js            # MPD XML parser
 │       ├── aes-decrypt.js            # AES-128-CBC decryption (Web Crypto API)
 │       ├── segment-downloader.js     # Segment fetch/decrypt/concat with retry
-│       └── iframe-resolver.js        # Iframe classification, auth extraction, embed parsing
+│       ├── iframe-resolver.js        # Iframe classification, auth extraction, embed parsing
+│       └── page-context.js           # Video title + slide-deck links from every frame
 ├── icons/                            # Extension icons (16/48/128px)
 ├── scripts/
 │   ├── generate-icons.js             # Node.js icon generator (no deps)

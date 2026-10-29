@@ -29,6 +29,9 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
+          # Install steps go first; GitHub's generated changelog is appended.
+          sed "s/{{VERSION}}/${GITHUB_REF_NAME}/g" .github/release-notes.md > "$RUNNER_TEMP/notes.md"
           gh release create "${GITHUB_REF_NAME}" "${{ steps.pkg.outputs.zip }}" \
             --title "Video Downloader ${GITHUB_REF_NAME}" \
+            --notes-file "$RUNNER_TEMP/notes.md" \
             --generate-notes
