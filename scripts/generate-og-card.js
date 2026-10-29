@@ -127,7 +127,7 @@ const svg = `<?xml version="1.0" encoding="UTF-8"?>
   <!-- Tech specs -->
   <text x="72" y="485" font-family="ui-monospace, 'SF Mono', 'JetBrains Mono', Menlo, monospace"
         font-size="14" font-weight="500" letter-spacing="2.4" fill="#ffb347">
-    HLS · DASH · AES-128 · IFRAME EMBEDS
+    WEBINARS · TRAINING · LECTURES · EMBEDDED PLAYERS
   </text>
 
   <!-- Byline -->
