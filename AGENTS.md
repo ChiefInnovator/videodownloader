@@ -30,6 +30,6 @@ Chrome Manifest V3 extension that detects and downloads video (direct files, HLS
 
 1. Bump `version` in `manifest.json` (semver) and merge to `main`.
 2. Tag and push: `git tag vX.Y.Z && git push origin vX.Y.Z`.
-3. `.github/workflows/release.yml` checks the tag matches the manifest version, runs `scripts/package.sh`, and publishes a GitHub Release with `videodownloader-vX.Y.Z.zip` attached.
+3. `.github/workflows/release.yml` checks the tag matches the manifest version, runs `scripts/package.sh`, and publishes a GitHub Release with `videodownloader-vX.Y.Z.zip` attached. Release notes start with the user-facing install steps in `.github/release-notes.md` (`{{VERSION}}` is substituted), followed by GitHub's generated changelog.
 
 Local package only: `bash scripts/package.sh` → `dist/videodownloader-v<version>.zip` (`dist/` and `*.zip` are gitignored).
