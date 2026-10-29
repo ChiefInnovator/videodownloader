@@ -20,6 +20,13 @@ const fs = require('fs');
 const path = require('path');
 const { execFileSync } = require('child_process');
 
+const ROOT = path.join(__dirname, '..');
+// The real extension icon, embedded so the SVG stays self-contained.
+const ICON = fs.readFileSync(path.join(ROOT, 'icons', 'icon128.png')).toString('base64');
+// "v2.3" from manifest.json, so the card tracks the release.
+const VERSION = JSON.parse(fs.readFileSync(path.join(ROOT, 'manifest.json'), 'utf8'))
+  .version.split('.').slice(0, 2).join('.');
+
 const W = 1200;
 const H = 630;
 
@@ -82,14 +89,13 @@ const svg = `<?xml version="1.0" encoding="UTF-8"?>
   <!-- Scanline overlay -->
   <rect width="${W}" height="${H}" fill="url(#scanlines)"/>
 
-  <!-- Top strip: play mark + product name + version -->
+  <!-- Top strip: extension icon + product name + version -->
   <g transform="translate(72, 72)">
-    <rect width="56" height="56" rx="12" fill="url(#ember)"/>
-    <polygon points="20,16 44,28 20,40" fill="#0b0907"/>
+    <image width="56" height="56" href="data:image/png;base64,${ICON}"/>
     <text x="80" y="24" font-family="ui-monospace, 'SF Mono', 'JetBrains Mono', Menlo, monospace"
           font-size="13" font-weight="600" letter-spacing="3.6" fill="#f2ece3">VIDEO DOWNLOADER</text>
     <text x="80" y="48" font-family="ui-monospace, 'SF Mono', 'JetBrains Mono', Menlo, monospace"
-          font-size="12" letter-spacing="2.4" fill="#7e7567">v2.1 · CHROME · MANIFEST V3</text>
+          font-size="12" letter-spacing="2.4" fill="#7e7567">v${VERSION} · CHROME · MANIFEST V3</text>
   </g>
 
   <!-- Free / no-tracking pill top-right -->
