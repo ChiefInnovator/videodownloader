@@ -18,7 +18,7 @@ Chrome Manifest V3 extension that detects and downloads video (direct files, HLS
 - **No telemetry, analytics, or accounts.** Nothing leaves the browser except fetches needed for the selected download. This is the product's core promise.
 - Don't add npm dependencies or a bundler; keep code loadable as-is via **Load unpacked**.
 - Don't add permissions or host permissions to `manifest.json` without a stated reason.
-- Default branch is `main`. Ship via feature branch + PR, merge commits only.
+- Branch flow: feature branches → PR into `develop` → PR from `develop` into `main` to release. `main` is protected (PR required, no force-push or deletion, enforced for admins). Merge commits only; merge commits are titled with the PR title.
 - When behavior changes, update `README.md`, `docs/ARCHITECTURE.md`, and (if user-facing) `docs/index.html` / `docs/llms.txt`.
 
 ## Verify
@@ -28,7 +28,7 @@ Chrome Manifest V3 extension that detects and downloads video (direct files, HLS
 
 ## Release
 
-1. Bump `version` in `manifest.json` (semver) and merge to `main`.
+1. Bump `version` in `manifest.json` (semver) on a feature branch, merge it into `develop`, then open a `develop` → `main` PR and merge it.
 2. Tag and push: `git tag vX.Y.Z && git push origin vX.Y.Z`.
 3. `.github/workflows/release.yml` checks the tag matches the manifest version, runs `scripts/package.sh`, and publishes a GitHub Release with `videodownloader-vX.Y.Z.zip` attached. Release notes start with the user-facing install steps in `.github/release-notes.md` (`{{VERSION}}` is substituted), followed by GitHub's generated changelog.
 
