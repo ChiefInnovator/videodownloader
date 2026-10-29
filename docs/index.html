@@ -392,12 +392,10 @@
   }
   .logo-mark {
     width: 30px; height: 30px;
-    display: grid; place-items: center;
-    background: linear-gradient(160deg, var(--ember) 0%, var(--ember-deep) 100%);
-    border-radius: 7px;
+    display: block;
+    border-radius: 50%;
     box-shadow: 0 0 24px rgba(255, 106, 26, 0.45);
   }
-  .logo-mark svg { width: 16px; height: 16px; fill: var(--ink); }
   .nav-links { display: flex; gap: 28px; align-items: center; }
   .nav-links a {
     color: var(--bone-dim);
@@ -889,9 +887,7 @@
 <nav>
   <div class="container nav-inner">
     <a class="logo" href="#top" aria-label="Video Downloader">
-      <span class="logo-mark" aria-hidden="true">
-        <svg viewBox="0 0 24 24"><path d="M6 4l14 8-14 8z"/></svg>
-      </span>
+      <img class="logo-mark" src="icons/icon128.png" alt="" width="30" height="30">
       <span>Video Downloader</span>
     </a>
     <div class="nav-links">
