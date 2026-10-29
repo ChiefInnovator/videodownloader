@@ -50,6 +50,12 @@ videodownloader/
     └── ARCHITECTURE.md               # Detailed architecture documentation
 ```
 
+## Install
+
+1. Download `videodownloader-vX.Y.Z.zip` from the latest [GitHub Release](https://github.com/ChiefInnovator/videodownloader/releases/latest) and unzip it
+2. Open `chrome://extensions/` and enable **Developer mode** (top-right)
+3. Click **Load unpacked** and select the unzipped folder
+
 ## Local Testing
 
 ### 1. Generate Icons (optional — pre-built icons included)
@@ -91,12 +97,21 @@ Or open `scripts/generate-icons.html` in Chrome and click **Download All Icons**
 ## Chrome Web Store Packaging
 
 1. Ensure PNG icons exist in `icons/`
-2. Zip the extension directory:
+2. Build the zip (manifest, `src/`, `icons/` only):
    ```bash
-   cd videodownloader
-   zip -r ../video-downloader.zip . -x ".*" "scripts/*" "docs/*" "node_modules/*"
+   bash scripts/package.sh   # → dist/videodownloader-v<version>.zip
    ```
 3. Upload the zip at the [Chrome Developer Dashboard](https://chrome.google.com/webstore/devconsole)
+
+## Releasing
+
+Bump `version` in `manifest.json`, merge to `main`, then push a matching tag:
+
+```bash
+git tag v2.1.0 && git push origin v2.1.0
+```
+
+The [Release workflow](.github/workflows/release.yml) packages the extension and publishes a GitHub Release with the zip attached.
 
 ## Known Limitations
 
