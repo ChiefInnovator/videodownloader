@@ -7,13 +7,15 @@
 
 <!-- Primary SEO -->
 <title>Video Downloader v2.1 — Capture HLS, DASH & AES‑128 Streams From Any Page | Chrome Extension by Rich Crane</title>
-<meta name="description" content="Free Chrome extension that detects and downloads HTML5 video, HLS (.m3u8), DASH (.mpd), AES‑128 encrypted streams, and cross‑origin iframe embeds from Medius, Vimeo, Mux, Wistia, and Brightcove. Segment‑level progress, pause/resume, JWT + cookie auth forwarding, DRM‑aware. Built by Microsoft MVP Rich Crane — Inventing Fire with AI.">
-<meta name="keywords" content="video downloader, chrome extension video downloader, HLS downloader, m3u8 downloader, DASH downloader, mpd downloader, AES-128 HLS decryption, iframe video download, Medius video downloader, Vimeo embed downloader, Mux stream downloader, Wistia downloader, Brightcove downloader, HLS to MP4, video stream capture, offline video archive, manifest v3 extension, Widevine detection, PlayReady detection, FairPlay detection, Rich Crane, Richard Crane, MILL5, Inventing Fire with AI, Microsoft MVP">
+<meta name="description" content="Free Chrome extension that detects and downloads HTML5 video, HLS (.m3u8), DASH (.mpd), AES‑128 encrypted streams, and cross‑origin iframe embeds from Medius, ON24, Vimeo, Mux, Wistia, and Brightcove. Segment‑level progress, pause/resume, JWT + cookie auth forwarding, DRM‑aware. Built by Microsoft MVP Rich Crane — Inventing Fire with AI.">
+<meta name="keywords" content="video downloader, chrome extension video downloader, HLS downloader, m3u8 downloader, DASH downloader, mpd downloader, AES-128 HLS decryption, iframe video download, Medius video downloader, ON24 video downloader, DASH to MP4, mpd to mp4, Vimeo embed downloader, Mux stream downloader, Wistia downloader, Brightcove downloader, HLS to MP4, video stream capture, offline video archive, manifest v3 extension, Widevine detection, PlayReady detection, FairPlay detection, Rich Crane, Richard Crane, MILL5, Inventing Fire with AI, Microsoft MVP">
 <meta name="author" content="Richard Crane">
 <meta name="robots" content="index, follow, max-snippet:-1, max-image-preview:large, max-video-preview:-1">
 <meta name="theme-color" content="#0b0907">
 <meta name="application-name" content="Video Downloader">
 <link rel="canonical" href="https://chiefinnovator.github.io/videodownloader/">
+<link rel="sitemap" type="application/xml" href="https://chiefinnovator.github.io/videodownloader/sitemap.xml">
+<link rel="alternate" type="text/plain" title="llms.txt" href="https://chiefinnovator.github.io/videodownloader/llms.txt">
 
 <!-- Geo / Language targeting -->
 <link rel="alternate" hreflang="en" href="https://chiefinnovator.github.io/videodownloader/">
@@ -23,10 +25,10 @@
 <meta name="language" content="en">
 
 <!-- Favicons -->
-<link rel="icon" type="image/png" sizes="128x128" href="../icons/icon128.png">
-<link rel="icon" type="image/png" sizes="48x48" href="../icons/icon48.png">
-<link rel="icon" type="image/png" sizes="16x16" href="../icons/icon16.png">
-<link rel="apple-touch-icon" href="../icons/icon128.png">
+<link rel="icon" type="image/png" sizes="128x128" href="icons/icon128.png">
+<link rel="icon" type="image/png" sizes="48x48" href="icons/icon48.png">
+<link rel="icon" type="image/png" sizes="16x16" href="icons/icon16.png">
+<link rel="apple-touch-icon" href="icons/icon128.png">
 
 <!-- Open Graph -->
 <meta property="og:type" content="website">
@@ -84,14 +86,20 @@
     "url": "https://mill5.com"
   },
   "url": "https://chiefinnovator.github.io/videodownloader/",
-  "downloadUrl": "https://github.com/ChiefInnovator/videodownloader/releases",
+  "downloadUrl": "https://github.com/ChiefInnovator/videodownloader/releases/latest",
+  "installUrl": "https://chiefinnovator.github.io/videodownloader/#install",
+  "releaseNotes": "https://github.com/ChiefInnovator/videodownloader/releases/tag/v2.1.0",
+  "fileSize": "57 KB",
+  "isAccessibleForFree": true,
+  "datePublished": "2026-03-26",
+  "dateModified": "2026-10-29",
   "softwareRequirements": "Chromium 114+ with Manifest V3 support",
   "featureList": [
     "Automatic HTML5 <video> element detection",
     "HLS (.m3u8) master and media playlist parsing",
-    "DASH (.mpd) adaptation set and representation parsing",
+    "DASH (.mpd) parsing with video and audio muxed into a single MP4 (no re‑encoding)",
     "AES‑128 CBC segment decryption via Web Crypto API",
-    "Cross‑origin iframe embed resolution (Medius, Vimeo, Mux, Wistia, Brightcove)",
+    "Cross‑origin iframe embed resolution (Medius, ON24, Vimeo, Mux, Wistia, Brightcove)",
     "JWT token and session cookie authentication forwarding",
     "DRM detection for Widevine, PlayReady, and FairPlay",
     "Quality selection for multi‑variant HLS and multi‑representation DASH",
@@ -155,7 +163,7 @@
       "name": "What does the Video Downloader Chrome extension do?",
       "acceptedAnswer": {
         "@type": "Answer",
-        "text": "Video Downloader detects video content on any web page — HTML5 <video> elements, HLS (.m3u8) playlists, DASH (.mpd) manifests, AES‑128 encrypted streams, and cross‑origin iframe embeds from platforms like Medius, Vimeo, Mux, Wistia, and Brightcove — then downloads it for offline viewing. It parses manifests, fetches encryption keys, decrypts segments in the browser via the Web Crypto API, and assembles the final file with segment‑level progress, pause, resume, and cancel."
+        "text": "Video Downloader detects video content on any web page — HTML5 <video> elements, HLS (.m3u8) playlists, DASH (.mpd) manifests, AES‑128 encrypted streams, and cross‑origin iframe embeds from platforms like Medius, ON24, Vimeo, Mux, Wistia, and Brightcove — then downloads it for offline viewing. It parses manifests, fetches encryption keys, decrypts segments in the browser via the Web Crypto API, and assembles the final file with segment‑level progress, pause, resume, and cancel."
       }
     },
     {
@@ -171,7 +179,7 @@
       "name": "Does Video Downloader work with cross‑origin iframe embeds?",
       "acceptedAnswer": {
         "@type": "Answer",
-        "text": "Yes. The extension scans every <iframe> on the page, classifies each one by domain and path (Medius, Vimeo, Mux, Wistia, Brightcove, and generic /embed/, /video/, /player/ paths), and resolves streams by combining network‑level manifest capture with embed‑page parsing. JWT tokens from the iframe URL and session cookies from the origin are forwarded on manifest, segment, and key requests so authenticated streams just work."
+        "text": "Yes. The extension scans every <iframe> on the page, classifies each one by domain and path (Medius, ON24, Vimeo, Mux, Wistia, Brightcove, and generic /embed/, /video/, /player/ paths), and resolves streams by combining network‑level manifest capture with embed‑page parsing. JWT tokens from the iframe URL and session cookies from the origin are forwarded on manifest, segment, and key requests so authenticated streams just work."
       }
     },
     {
@@ -187,7 +195,7 @@
       "name": "Does Video Downloader support DASH (.mpd) streams?",
       "acceptedAnswer": {
         "@type": "Answer",
-        "text": "Yes. The extension parses DASH Media Presentation Description (.mpd) manifests — reading adaptation sets, representations, segment templates, and timelines — to enumerate available qualities and download the chosen representation as a single file."
+        "text": "Yes. The extension parses DASH Media Presentation Description (.mpd) manifests — reading adaptation sets, representations, segment templates, and timelines — to enumerate available qualities. It downloads the chosen video representation plus the best audio track and muxes them into a single MP4 in the browser — no re‑encoding and no ffmpeg required."
       }
     },
     {
@@ -216,10 +224,18 @@
     },
     {
       "@type": "Question",
+      "name": "How do I install Video Downloader?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "Download the latest videodownloader-vX.Y.Z.zip from GitHub Releases (https://github.com/ChiefInnovator/videodownloader/releases/latest) and unzip it. Open chrome://extensions, turn on Developer mode, click Load unpacked, and select the unzipped folder. The fire‑orange play icon appears in the toolbar."
+      }
+    },
+    {
+      "@type": "Question",
       "name": "How do I convert the downloaded .ts file to MP4?",
       "acceptedAnswer": {
         "@type": "Answer",
-        "text": "Use ffmpeg. A fast, lossless remux: ffmpeg -i input.ts -c copy output.mp4. This repackages the MPEG‑TS container into MP4 without re‑encoding, so it finishes in seconds and preserves original quality."
+        "text": "HLS downloads save as MPEG‑TS (.ts); DASH downloads are already MP4. To convert a .ts file, use ffmpeg. A fast, lossless remux: ffmpeg -i input.ts -c copy output.mp4. This repackages the MPEG‑TS container into MP4 without re‑encoding, so it finishes in seconds and preserves original quality."
       }
     }
   ]
@@ -232,13 +248,13 @@
   "@context": "https://schema.org",
   "@type": "HowTo",
   "name": "How to download a cross‑origin iframe video stream with Video Downloader",
-  "description": "Steps to detect and download a video embedded via a cross‑origin iframe (Medius, Vimeo, Mux, Wistia, Brightcove) using the Video Downloader Chrome extension.",
+  "description": "Steps to detect and download a video embedded via a cross‑origin iframe (Medius, ON24, Vimeo, Mux, Wistia, Brightcove) using the Video Downloader Chrome extension.",
   "step": [
-    { "@type": "HowToStep", "position": 1, "name": "Install", "text": "Install the Video Downloader extension from the GitHub release or Chrome Web Store." },
+    { "@type": "HowToStep", "position": 1, "name": "Install", "text": "Download the latest release zip from GitHub Releases, unzip it, and load the folder with Load unpacked at chrome://extensions (Developer mode on)." },
     { "@type": "HowToStep", "position": 2, "name": "Navigate", "text": "Open the page containing the embedded video and click the Video Downloader toolbar icon." },
     { "@type": "HowToStep", "position": 3, "name": "Resolve", "text": "Under Embedded Streams, click Resolve Stream. The extension parses the embed, forwards your session cookies and any JWT token in the iframe URL, and expands the manifest." },
     { "@type": "HowToStep", "position": 4, "name": "Select quality", "text": "Pick a variant from the quality dropdown. If DRM is detected, the extension warns you and stops." },
-    { "@type": "HowToStep", "position": 5, "name": "Download", "text": "Click Download. Watch segment‑level progress — pause, resume, or cancel at any time. The final file saves as .ts (HLS) or the DASH representation." }
+    { "@type": "HowToStep", "position": 5, "name": "Download", "text": "Click Download. Watch segment‑level progress — pause, resume, or cancel at any time. The final file saves as .ts (HLS) or .mp4 (DASH, video and audio muxed)." }
   ]
 }
 </script>
@@ -869,7 +885,7 @@
       <a href="#how">How it works</a>
       <a href="#install">Install</a>
       <a href="#faq">FAQ</a>
-      <a class="nav-cta" href="https://github.com/ChiefInnovator/videodownloader/releases" rel="noopener">Download</a>
+      <a class="nav-cta" href="https://github.com/ChiefInnovator/videodownloader/releases/latest" rel="noopener">Download</a>
     </div>
   </div>
 </nav>
@@ -885,7 +901,7 @@
         A Chrome extension that sees past <code style="font-family:var(--mono);font-size:15px;color:var(--ember-2)">&lt;video&gt;</code> tags — into HLS playlists, DASH manifests, AES‑128 encrypted segments, and cross‑origin iframe embeds — and pulls a single offline file out the other side. Free. No sign‑in. No analytics. Nothing leaves your browser except the segments it takes to download what you asked for. Built for journalists, researchers, educators, and engineers who need what they're watching to stay watchable.
       </p>
       <div class="hero-cta">
-        <a class="btn btn-primary" href="https://github.com/ChiefInnovator/videodownloader/releases" rel="noopener">
+        <a class="btn btn-primary" href="https://github.com/ChiefInnovator/videodownloader/releases/latest" rel="noopener">
           <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 3v12m0 0l-4-4m4 4l4-4M5 21h14"/><path d="M5 21h14" stroke="currentColor" stroke-width="2" stroke-linecap="round" fill="none"/></svg>
           Download v2.1.0
         </a>
@@ -925,7 +941,7 @@
         <div class="feature wide">
           <div class="feature-ord">01 · Adaptive streams</div>
           <h3>HLS &amp; DASH, parsed in the browser</h3>
-          <p>Master playlists and media playlists. <code>.m3u8</code> and <code>.mpd</code>. Adaptation sets, representations, segment templates, and timelines. Pick a quality; the extension fetches every segment, handles continuity, and writes one file.</p>
+          <p>Master playlists and media playlists. <code>.m3u8</code> and <code>.mpd</code>. Adaptation sets, representations, segment templates, and timelines. Pick a quality; the extension fetches every segment, handles continuity, and writes one file — DASH video and audio are muxed into a single MP4.</p>
         </div>
         <div class="feature wide">
           <div class="feature-ord">02 · Encryption</div>
@@ -935,7 +951,7 @@
         <div class="feature">
           <div class="feature-ord">03 · Iframe embeds</div>
           <h3>Cross‑origin players</h3>
-          <p>Classifies embeds from Medius, Vimeo, Mux, Wistia, Brightcove, and generic <code>/embed/</code>, <code>/player/</code>, <code>/video/</code> paths — then resolves their manifests.</p>
+          <p>Classifies embeds from Medius, ON24, Vimeo, Mux, Wistia, Brightcove, and generic <code>/embed/</code>, <code>/player/</code>, <code>/video/</code> paths — then resolves their manifests.</p>
         </div>
         <div class="feature">
           <div class="feature-ord">04 · Authentication</div>
@@ -1040,7 +1056,7 @@
       <div class="section-head">
         <div class="section-kicker">0.04 — Install</div>
         <h2 class="section-title">Load unpacked.<br><em>Done.</em></h2>
-        <p class="section-lede">No build step. No package manager. No account. Clone, load, use. The Chrome Web Store listing is in review.</p>
+        <p class="section-lede">No build step. No package manager. No account. Download, load, use. The Chrome Web Store listing is in review.</p>
       </div>
 
       <div class="steps">
@@ -1064,7 +1080,7 @@
           <div class="step-num">03</div>
           <div>
             <h4>Load unpacked</h4>
-            <p>Click <b>Load unpacked</b>, select the <code>videodownloader/</code> directory. The fire‑orange play icon appears in your toolbar.</p>
+            <p>Click <b>Load unpacked</b>, select the unzipped release folder (or the cloned <code>videodownloader/</code> directory). The fire‑orange play icon appears in your toolbar.</p>
           </div>
         </div>
         <div class="step">
@@ -1108,7 +1124,7 @@
         </details>
         <details>
           <summary>Does it work with cross‑origin iframe embeds?</summary>
-          <p>Yes. The extension scans every <code>&lt;iframe&gt;</code> on the page, classifies each one by domain and path (Medius, Vimeo, Mux, Wistia, Brightcove, and generic <code>/embed/</code>, <code>/video/</code>, <code>/player/</code> paths), and resolves streams by combining network‑level manifest capture with embed‑page parsing. JWT tokens from the iframe URL and session cookies from the origin are forwarded on manifest, segment, and key requests so authenticated streams just work.</p>
+          <p>Yes. The extension scans every <code>&lt;iframe&gt;</code> on the page, classifies each one by domain and path (Medius, ON24, Vimeo, Mux, Wistia, Brightcove, and generic <code>/embed/</code>, <code>/video/</code>, <code>/player/</code> paths), and resolves streams by combining network‑level manifest capture with embed‑page parsing. JWT tokens from the iframe URL and session cookies from the origin are forwarded on manifest, segment, and key requests so authenticated streams just work.</p>
         </details>
         <details>
           <summary>Can it bypass Widevine, PlayReady, or FairPlay DRM?</summary>
@@ -1116,7 +1132,7 @@
         </details>
         <details>
           <summary>Does it support DASH (.mpd) streams?</summary>
-          <p>Yes. The extension parses DASH Media Presentation Description (<code>.mpd</code>) manifests — adaptation sets, representations, segment templates, and timelines — to enumerate available qualities and download the chosen representation as a single file.</p>
+          <p>Yes. The extension parses DASH Media Presentation Description (<code>.mpd</code>) manifests — adaptation sets, representations, segment templates, and timelines — to enumerate available qualities. It downloads the chosen video representation plus the best audio track and muxes them into a single MP4 in the browser — no re‑encoding and no ffmpeg required.</p>
         </details>
         <details>
           <summary>What browsers does it support?</summary>
@@ -1127,8 +1143,12 @@
           <p>No. Video Downloader has no analytics, no telemetry, and no third‑party network calls. All processing — manifest parsing, segment fetching, decryption, and assembly — happens locally in your browser. There is no account, no sign‑in, and nothing is sent to any server owned by the developer.</p>
         </details>
         <details>
+          <summary>How do I install it?</summary>
+          <p>Download the latest <code>videodownloader-vX.Y.Z.zip</code> from <a href="https://github.com/ChiefInnovator/videodownloader/releases/latest" rel="noopener">GitHub Releases</a> and unzip it. Open <code>chrome://extensions</code>, turn on Developer mode, click <b>Load unpacked</b>, and select the unzipped folder. The fire‑orange play icon appears in the toolbar.</p>
+        </details>
+        <details>
           <summary>How do I convert the downloaded .ts file to MP4?</summary>
-          <p>Use ffmpeg. A fast, lossless remux: <code>ffmpeg -i input.ts -c copy output.mp4</code>. This repackages the MPEG‑TS container into MP4 without re‑encoding, so it finishes in seconds and preserves original quality.</p>
+          <p>HLS downloads save as MPEG‑TS (<code>.ts</code>); DASH downloads are already MP4. To convert a <code>.ts</code> file, use ffmpeg. A fast, lossless remux: <code>ffmpeg -i input.ts -c copy output.mp4</code>. This repackages the MPEG‑TS container into MP4 without re‑encoding, so it finishes in seconds and preserves original quality.</p>
         </details>
         <details>
           <summary>Who built this?</summary>
@@ -1165,7 +1185,7 @@
       <h2>Save what you're<br><em>actually</em> watching.</h2>
       <p>Free. No account. No telemetry. Works on any Chromium browser.</p>
       <div class="hero-cta" style="justify-content:center">
-        <a class="btn btn-primary" href="https://github.com/ChiefInnovator/videodownloader/releases" rel="noopener">Download v2.1.0</a>
+        <a class="btn btn-primary" href="https://github.com/ChiefInnovator/videodownloader/releases/latest" rel="noopener">Download v2.1.0</a>
         <a class="btn btn-secondary" href="https://github.com/ChiefInnovator/videodownloader" rel="noopener">Source on GitHub</a>
       </div>
     </div>
