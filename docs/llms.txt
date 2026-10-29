@@ -6,7 +6,7 @@ The core motivation: a free video downloader that doesn't track what you are doi
 
 Video Downloader is developed by Richard Crane (Microsoft MVP, founder and Chief AI Officer of MILL5, host of the *Inventing Fire with AI* podcast). It is part of the Inventing Fire with AI initiative. The extension respects content protection — it detects Widevine, PlayReady, and FairPlay DRM and warns the user rather than attempting to circumvent it.
 
-The current release is v2.3.0 (published 2026-10-29). It is distributed as a Chrome Manifest V3 extension via GitHub Releases (the Chrome Web Store listing is in review).
+The current release is v2.3.1 (published 2026-10-29). It is distributed as a Chrome Manifest V3 extension via GitHub Releases (the Chrome Web Store listing is in review).
 
 ## Install
 
