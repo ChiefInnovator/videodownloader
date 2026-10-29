@@ -32,6 +32,7 @@
  * @property {string}      url
  * @property {string|null} fallbackUrl
  * @property {string|null} range
+ * @property {HlsKeyInfo|null} key — encryption applying to the init segment
  */
 
 /**
@@ -145,6 +146,8 @@ export function parseMediaPlaylistDetailed(body, baseUrl) {
         currentMap = {
           ...withQueryFallback(resolveUrl(attrs.URI, baseUrl), baseUrl),
           range: range ? rangeHeader(range.length, range.offset ?? 0) : null,
+          // The EXT-X-KEY in effect when the map is declared applies to it.
+          key: currentKey ? { ...currentKey } : null,
         };
       }
       continue;

@@ -58,7 +58,7 @@ Long-lived Manifest V3 service worker — the central coordinator:
 - **Badge management** — shows video count on the extension icon per tab.
 - **Iframe stream resolution** — when the popup requests it, resolves a cross-origin iframe embed:
   1. For a known platform (Vimeo, Wistia, JW Player, Mux, Cloudflare Stream, Vidyard, Panopto), asks the platform's player API for the manifest (`platform-resolvers.js`), fetching from inside the embed's frame when `webNavigation.getAllFrames` finds it.
-  2. Checks if manifests from that origin were already captured via network interception.
+  2. Checks for manifests already captured via network interception that belong to this embed — requested by its frame (or a frame inside it) or served from its origin. Other players' manifests on the page are ignored.
   3. Falls back to fetching the embed page HTML and parsing for manifest URLs.
   3. Detects DRM indicators (Widevine/PlayReady/FairPlay UUIDs).
 - **Authentication forwarding** — extracts JWT tokens from iframe URL query parameters and retrieves session cookies via `chrome.cookies.getAll()`. Builds auth headers for all manifest/segment/key fetches.
@@ -74,7 +74,7 @@ Long-lived Manifest V3 service worker — the central coordinator:
 
 Rendered when the user clicks the extension icon:
 
-- Queries both content script (`getVideos`) and service worker (`getNetworkVideos`) in parallel.
+- Queries the content script in every frame (`getVideos`, one message per `frameId` from `webNavigation.getAllFrames`, since a broadcast returns only the first frame's reply) and the service worker (`getNetworkVideos`) in parallel.
 - Deduplicates direct videos by URL and renders video cards with thumbnail, metadata badges, and download button.
 - Renders a separate **"Embedded Streams"** section for detected iframes, each with a **Resolve Stream** button.
 - On resolve: calls the service worker to extract manifest URLs, shows DRM warnings if applicable, or populates a quality dropdown with available variants. DASH streams with a separate audio track also get an **Audio only (.m4a)** entry; the service worker then downloads just that representation and saves it as `audio/mp4`.
