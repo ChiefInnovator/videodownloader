@@ -65,9 +65,11 @@ export function ivFromSequenceNumber(sequenceNumber) {
  * @returns {ArrayBuffer} — 16 bytes
  */
 export function ivFromHex(hexStr) {
-  const hex = hexStr.replace(/^0x/i, '');
-  if (hex.length !== 32) {
-    throw new Error(`Invalid IV hex length: expected 32 chars, got ${hex.length}`);
+  // HLS defines the IV as a 128-bit integer, so shorter values (IV=0x1)
+  // are zero-padded on the left.
+  const hex = hexStr.replace(/^0x/i, '').padStart(32, '0');
+  if (hex.length !== 32 || /[^0-9a-f]/i.test(hex)) {
+    throw new Error(`Invalid IV: ${hexStr}`);
   }
   const bytes = new Uint8Array(16);
   for (let i = 0; i < 16; i++) {

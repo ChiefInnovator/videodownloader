@@ -78,7 +78,7 @@ async function loadVideos() {
 
   // Gather from content script, network interception, and iframes.
   const [contentResult, networkResult] = await Promise.allSettled([
-    chrome.tabs.sendMessage(tab.id, { action: 'getVideos' }),
+    getVideosFromAllFrames(tab.id),
     chrome.runtime.sendMessage({ action: 'getNetworkVideos', tabId: tab.id }),
   ]);
   pageContext = await loadPageContext(tab.id);
@@ -182,6 +182,26 @@ function assignNames(videos) {
 }
 
 /** Collect the video title and slide links from every frame of the tab. */
+/**
+ * Ask the content script in every frame for its videos. A plain
+ * tabs.sendMessage broadcasts to all frames but only the first response
+ * arrives, so iframe-only sources would be lost.
+ */
+async function getVideosFromAllFrames(tabId) {
+  let frames;
+  try {
+    frames = await chrome.webNavigation.getAllFrames({ tabId });
+  } catch { /* fall through */ }
+  if (!frames?.length) return chrome.tabs.sendMessage(tabId, { action: 'getVideos' });
+
+  const results = await Promise.all(frames.map(f =>
+    chrome.tabs.sendMessage(tabId, { action: 'getVideos' }, { frameId: f.frameId }).catch(() => null)));
+  return {
+    videos: results.flatMap(r => r?.videos || []),
+    iframes: results.flatMap(r => r?.iframes || []),
+  };
+}
+
 async function loadPageContext(tabId) {
   let frames = [];
   try {
