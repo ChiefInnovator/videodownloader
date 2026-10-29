@@ -6,7 +6,7 @@
 <meta name="color-scheme" content="dark">
 
 <!-- Primary SEO -->
-<title>Video Downloader v2.1 — Capture HLS, DASH & AES‑128 Streams From Any Page | Chrome Extension by Rich Crane</title>
+<title>Video Downloader v2.3 — Capture HLS, DASH & AES‑128 Streams From Any Page | Chrome Extension by Rich Crane</title>
 <meta name="description" content="Free Chrome extension that detects and downloads HTML5 video, HLS (.m3u8), DASH (.mpd), AES‑128 encrypted streams, and cross‑origin iframe embeds from Medius, ON24, Vimeo, Mux, Wistia, and Brightcove. Segment‑level progress, pause/resume, JWT + cookie auth forwarding, DRM‑aware. Built by Microsoft MVP Rich Crane — Inventing Fire with AI.">
 <meta name="keywords" content="video downloader, chrome extension video downloader, HLS downloader, m3u8 downloader, DASH downloader, mpd downloader, AES-128 HLS decryption, iframe video download, Medius video downloader, ON24 video downloader, DASH to MP4, mpd to mp4, Vimeo embed downloader, Mux stream downloader, Wistia downloader, Brightcove downloader, HLS to MP4, video stream capture, offline video archive, manifest v3 extension, Widevine detection, PlayReady detection, FairPlay detection, Rich Crane, Richard Crane, MILL5, Inventing Fire with AI, Microsoft MVP">
 <meta name="author" content="Richard Crane">
@@ -33,7 +33,7 @@
 <!-- Open Graph -->
 <meta property="og:type" content="website">
 <meta property="og:site_name" content="Video Downloader">
-<meta property="og:title" content="Video Downloader v2.1 — Capture HLS, DASH & AES‑128 Streams From Any Page">
+<meta property="og:title" content="Video Downloader v2.3 — Capture HLS, DASH & AES‑128 Streams From Any Page">
 <meta property="og:description" content="Detect and download HTML5 video, HLS, DASH, AES‑128 encrypted streams, and cross‑origin iframe embeds. Free Chrome extension by Microsoft MVP Rich Crane.">
 <meta property="og:url" content="https://chiefinnovator.github.io/videodownloader/">
 <meta property="og:image" content="https://chiefinnovator.github.io/videodownloader/images/og-card.png">
@@ -48,7 +48,7 @@
 <meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:site" content="@chiefinnovator">
 <meta name="twitter:creator" content="@chiefinnovator">
-<meta name="twitter:title" content="Video Downloader v2.1 — Capture HLS, DASH & AES‑128 Streams From Any Page">
+<meta name="twitter:title" content="Video Downloader v2.3 — Capture HLS, DASH & AES‑128 Streams From Any Page">
 <meta name="twitter:description" content="Free Chrome extension that detects and downloads HTML5 video, HLS (.m3u8), DASH (.mpd), AES‑128 encrypted streams, and cross‑origin iframe embeds. By Rich Crane.">
 <meta name="twitter:image" content="https://chiefinnovator.github.io/videodownloader/images/og-card.png">
 <meta name="twitter:image:alt" content="Video Downloader — Chrome extension capturing HLS and DASH streams.">
@@ -60,8 +60,8 @@
   "@type": "SoftwareApplication",
   "name": "Video Downloader",
   "alternateName": "Inventing Fire Video Downloader",
-  "description": "A Chrome (Manifest V3) extension that detects HTML5 video, HLS (.m3u8), DASH (.mpd), AES‑128 encrypted streams, and cross‑origin iframe embeds, then downloads them for offline viewing. Includes segment‑level progress, pause/resume/cancel, JWT and cookie authentication forwarding, and DRM detection for Widevine, PlayReady, and FairPlay.",
-  "softwareVersion": "2.1.0",
+  "description": "A Chrome (Manifest V3) extension that detects HTML5 video, HLS (.m3u8), DASH (.mpd), AES‑128 encrypted streams, fMP4/CMAF HLS, and cross‑origin iframe embeds — resolving Vimeo, Wistia, JW Player, Mux, Cloudflare Stream, Vidyard, and Panopto embeds through each platform's own player API — then downloads them for offline viewing. Includes segment‑level progress, automatic retries that skip a briefly unavailable segment, pause/resume/cancel, JWT and cookie authentication forwarding, and DRM detection for Widevine, PlayReady, and FairPlay.",
+  "softwareVersion": "2.3.0",
   "applicationCategory": "BrowserApplication",
   "applicationSubCategory": "Chrome Extension",
   "operatingSystem": "Chrome 114+, Edge 114+, Brave, Arc, Vivaldi (any Chromium browser supporting Manifest V3)",
@@ -88,8 +88,8 @@
   "url": "https://chiefinnovator.github.io/videodownloader/",
   "downloadUrl": "https://github.com/ChiefInnovator/videodownloader/releases/latest",
   "installUrl": "https://chiefinnovator.github.io/videodownloader/#install",
-  "releaseNotes": "https://github.com/ChiefInnovator/videodownloader/releases/tag/v2.1.0",
-  "fileSize": "57 KB",
+  "releaseNotes": "https://github.com/ChiefInnovator/videodownloader/releases/tag/v2.3.0",
+  "fileSize": "68 KB",
   "isAccessibleForFree": true,
   "datePublished": "2026-03-26",
   "dateModified": "2026-10-29",
@@ -97,11 +97,17 @@
   "featureList": [
     "Automatic HTML5 <video> element detection",
     "HLS (.m3u8) master and media playlist parsing",
+    "fMP4 / CMAF HLS (EXT-X-MAP) saved as MP4, plus byte‑range (EXT-X-BYTERANGE) segments",
+    "Platform API resolution for Vimeo, Wistia, JW Player, Mux, Cloudflare Stream, Vidyard, and Panopto embeds",
+    "Signed‑URL CDN support: playlist tokens carried to segment and key requests",
+    "Resilient downloads: retries with backoff, skips a briefly unavailable segment, strips Anvato/Uplynk ad segments",
+    "Player‑config detection: JW Player, Video.js, Flowplayer, Next.js and Nuxt page data, <mux-player>, JSON‑LD embedUrl, twitter:player:stream",
+    "Session‑titled filenames and linked slide‑deck downloads",
     "DASH (.mpd) parsing with video and audio muxed into a single MP4 (no re‑encoding)",
     "AES‑128 CBC segment decryption via Web Crypto API",
-    "Cross‑origin iframe embed resolution (Medius, ON24, Vimeo, Mux, Wistia, Brightcove)",
+    "Cross‑origin iframe embed resolution (Medius, ON24, Vimeo, Mux, Wistia, Brightcove, JW Player, Cloudflare Stream, Vidyard, Panopto)",
     "JWT token and session cookie authentication forwarding",
-    "DRM detection for Widevine, PlayReady, and FairPlay",
+    "DRM detection for Widevine, PlayReady, FairPlay (skd://), and Adobe Access — detected and refused, never circumvented",
     "Quality selection for multi‑variant HLS and multi‑representation DASH",
     "Segment‑level download progress with pause, resume, and cancel",
     "SPA‑compatible detection via MutationObserver",
@@ -179,7 +185,7 @@
       "name": "Does Video Downloader work with cross‑origin iframe embeds?",
       "acceptedAnswer": {
         "@type": "Answer",
-        "text": "Yes. The extension scans every <iframe> on the page, classifies each one by domain and path (Medius, ON24, Vimeo, Mux, Wistia, Brightcove, and generic /embed/, /video/, /player/ paths), and resolves streams by combining network‑level manifest capture with embed‑page parsing. JWT tokens from the iframe URL and session cookies from the origin are forwarded on manifest, segment, and key requests so authenticated streams just work."
+        "text": "Yes. The extension scans every <iframe> on the page, classifies each one by domain and path (Medius, ON24, Vimeo, Mux, Wistia, Brightcove, JW Player, Cloudflare Stream, Vidyard, Panopto, and generic /embed/, /video/, /player/ paths), and resolves streams by asking the platform's own player API for Vimeo, Wistia, JW Player, Mux, Cloudflare Stream, Vidyard, and Panopto, then falling back to network‑level manifest capture and embed‑page parsing. JWT tokens from the iframe URL and session cookies from the origin are forwarded on manifest, segment, and key requests so authenticated streams just work."
       }
     },
     {
@@ -232,10 +238,18 @@
     },
     {
       "@type": "Question",
+      "name": "Which video platforms can Video Downloader resolve directly?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "For Vimeo, Wistia, JW Player, Mux, Cloudflare Stream, Vidyard, and Panopto embeds, the extension asks the platform's own public player API for the stream manifest, using your existing session — the same approach the open‑source yt‑dlp project uses. Any other player is still covered by network capture, embed‑page parsing, and player‑config detection (JW Player, Video.js, Flowplayer, Next.js and Nuxt page data). YouTube is not supported."
+      }
+    },
+    {
+      "@type": "Question",
       "name": "How do I convert the downloaded .ts file to MP4?",
       "acceptedAnswer": {
         "@type": "Answer",
-        "text": "HLS downloads save as MPEG‑TS (.ts); DASH downloads are already MP4. To convert a .ts file, use ffmpeg. A fast, lossless remux: ffmpeg -i input.ts -c copy output.mp4. This repackages the MPEG‑TS container into MP4 without re‑encoding, so it finishes in seconds and preserves original quality."
+        "text": "Classic HLS downloads save as MPEG‑TS (.ts); fMP4/CMAF HLS and DASH downloads are already MP4. To convert a .ts file, use ffmpeg. A fast, lossless remux: ffmpeg -i input.ts -c copy output.mp4. This repackages the MPEG‑TS container into MP4 without re‑encoding, so it finishes in seconds and preserves original quality."
       }
     }
   ]
@@ -903,7 +917,7 @@
       <div class="hero-cta">
         <a class="btn btn-primary" href="https://github.com/ChiefInnovator/videodownloader/releases/latest" rel="noopener">
           <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 3v12m0 0l-4-4m4 4l4-4M5 21h14"/><path d="M5 21h14" stroke="currentColor" stroke-width="2" stroke-linecap="round" fill="none"/></svg>
-          Download v2.1.0
+          Download v2.3.0
         </a>
         <a class="btn btn-secondary" href="https://github.com/ChiefInnovator/videodownloader" rel="noopener">
           <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 .5C5.65.5.5 5.65.5 12c0 5.08 3.29 9.39 7.86 10.91.58.1.79-.25.79-.56v-2c-3.2.7-3.88-1.37-3.88-1.37-.53-1.34-1.29-1.7-1.29-1.7-1.05-.72.08-.7.08-.7 1.16.08 1.77 1.19 1.77 1.19 1.04 1.77 2.72 1.26 3.38.96.1-.75.41-1.26.74-1.55-2.55-.29-5.23-1.28-5.23-5.68 0-1.26.45-2.28 1.18-3.09-.12-.29-.51-1.46.11-3.05 0 0 .97-.31 3.18 1.18.92-.26 1.91-.39 2.9-.39.98 0 1.98.13 2.9.39 2.2-1.49 3.17-1.18 3.17-1.18.63 1.59.24 2.76.12 3.05.74.81 1.18 1.83 1.18 3.09 0 4.41-2.69 5.38-5.25 5.67.42.36.79 1.07.79 2.16v3.2c0 .31.21.67.8.56C20.22 21.39 23.5 17.08 23.5 12 23.5 5.65 18.35.5 12 .5z"/></svg>
@@ -941,7 +955,7 @@
         <div class="feature wide">
           <div class="feature-ord">01 · Adaptive streams</div>
           <h3>HLS &amp; DASH, parsed in the browser</h3>
-          <p>Master playlists and media playlists. <code>.m3u8</code> and <code>.mpd</code>. Adaptation sets, representations, segment templates, and timelines. Pick a quality; the extension fetches every segment, handles continuity, and writes one file — DASH video and audio are muxed into a single MP4.</p>
+          <p>Master playlists and media playlists. <code>.m3u8</code> and <code>.mpd</code>. Adaptation sets, representations, segment templates, and timelines. Pick a quality; the extension fetches every segment, handles continuity, and writes one file — DASH video and audio are muxed into a single MP4, and fMP4/CMAF HLS saves straight to MP4.</p>
         </div>
         <div class="feature wide">
           <div class="feature-ord">02 · Encryption</div>
@@ -951,7 +965,7 @@
         <div class="feature">
           <div class="feature-ord">03 · Iframe embeds</div>
           <h3>Cross‑origin players</h3>
-          <p>Classifies embeds from Medius, ON24, Vimeo, Mux, Wistia, Brightcove, and generic <code>/embed/</code>, <code>/player/</code>, <code>/video/</code> paths — then resolves their manifests.</p>
+          <p>Classifies embeds from Medius, ON24, Vimeo, Mux, Wistia, Brightcove, JW Player, Cloudflare Stream, Vidyard, Panopto, and generic <code>/embed/</code>, <code>/player/</code>, <code>/video/</code> paths — then resolves their manifests.</p>
         </div>
         <div class="feature">
           <div class="feature-ord">04 · Authentication</div>
@@ -961,7 +975,7 @@
         <div class="feature">
           <div class="feature-ord">05 · DRM aware</div>
           <h3>Detects, never circumvents</h3>
-          <p>Surfaces Widevine, PlayReady, and FairPlay markers in the manifest and warns clearly. Protected content is identified — not broken.</p>
+          <p>Surfaces Widevine, PlayReady, FairPlay (<code>skd://</code>), and Adobe Access markers in the manifest and warns clearly. Protected content is identified — not broken.</p>
         </div>
         <div class="feature">
           <div class="feature-ord">06 · Progress control</div>
@@ -977,6 +991,31 @@
           <div class="feature-ord">08 · Privacy</div>
           <h3>Local‑only, no telemetry</h3>
           <p>No analytics. No accounts. No third‑party network calls. Every parse, fetch, decrypt, and assembly happens inside your browser.</p>
+        </div>
+        <div class="feature wide">
+          <div class="feature-ord">09 · Platform APIs</div>
+          <h3>Asks the player, not the page</h3>
+          <p>Vimeo, Wistia, JW Player, Mux, Cloudflare Stream, Vidyard, and Panopto embeds resolve through each platform's own player API — the technique the open‑source <code>yt‑dlp</code> project uses — run inside the embed's frame with your existing session. Anything else falls back to network capture and embed parsing.</p>
+        </div>
+        <div class="feature wide">
+          <div class="feature-ord">10 · Modern HLS</div>
+          <h3>CMAF, byte ranges, signed URLs</h3>
+          <p>fMP4 playlists with <code>#EXT-X-MAP</code> init segments save as a playable MP4. <code>#EXT-X-BYTERANGE</code> segments are fetched with HTTP Range requests. When a CDN signs only the playlist URL, its token is carried onto segment and key requests.</p>
+        </div>
+        <div class="feature">
+          <div class="feature-ord">11 · Resilient</div>
+          <h3>One bad segment won't sink it</h3>
+          <p>Each segment retries with exponential backoff. If one stays unavailable, it's skipped and reported instead of failing a two‑hour download. Anvato and Uplynk ad segments are left out.</p>
+        </div>
+        <div class="feature">
+          <div class="feature-ord">12 · Deeper detection</div>
+          <h3>Reads player configs</h3>
+          <p>Finds streams in JW Player, Video.js, and Flowplayer setup code, Next.js and Nuxt page data, <code>&lt;mux-player&gt;</code> elements, JSON‑LD <code>embedUrl</code>, and <code>twitter:player:stream</code> cards.</p>
+        </div>
+        <div class="feature">
+          <div class="feature-ord">13 · Sessions &amp; slides</div>
+          <h3>Named files, slides included</h3>
+          <p>Downloads are named after the session or player title instead of <code>stream.mpd</code>, and linked slide decks (PDF, PPT, Key) are listed and saved alongside the video.</p>
         </div>
       </div>
     </div>
@@ -1124,7 +1163,7 @@
         </details>
         <details>
           <summary>Does it work with cross‑origin iframe embeds?</summary>
-          <p>Yes. The extension scans every <code>&lt;iframe&gt;</code> on the page, classifies each one by domain and path (Medius, ON24, Vimeo, Mux, Wistia, Brightcove, and generic <code>/embed/</code>, <code>/video/</code>, <code>/player/</code> paths), and resolves streams by combining network‑level manifest capture with embed‑page parsing. JWT tokens from the iframe URL and session cookies from the origin are forwarded on manifest, segment, and key requests so authenticated streams just work.</p>
+          <p>Yes. The extension scans every <code>&lt;iframe&gt;</code> on the page, classifies each one by domain and path (Medius, ON24, Vimeo, Mux, Wistia, Brightcove, JW Player, Cloudflare Stream, Vidyard, Panopto, and generic <code>/embed/</code>, <code>/video/</code>, <code>/player/</code> paths), and resolves streams by asking the platform's own player API for Vimeo, Wistia, JW Player, Mux, Cloudflare Stream, Vidyard, and Panopto, then falling back to network‑level manifest capture and embed‑page parsing. JWT tokens from the iframe URL and session cookies from the origin are forwarded on manifest, segment, and key requests so authenticated streams just work.</p>
         </details>
         <details>
           <summary>Can it bypass Widevine, PlayReady, or FairPlay DRM?</summary>
@@ -1147,8 +1186,12 @@
           <p>Download the latest <code>videodownloader-vX.Y.Z.zip</code> from <a href="https://github.com/ChiefInnovator/videodownloader/releases/latest" rel="noopener">GitHub Releases</a> and unzip it. Open <code>chrome://extensions</code>, turn on Developer mode, click <b>Load unpacked</b>, and select the unzipped folder. The fire‑orange play icon appears in the toolbar.</p>
         </details>
         <details>
+          <summary>Which video platforms can it resolve directly?</summary>
+          <p>For Vimeo, Wistia, JW Player, Mux, Cloudflare Stream, Vidyard, and Panopto embeds, the extension asks the platform's own public player API for the stream manifest, using your existing session — the same approach the open‑source <code>yt‑dlp</code> project uses. Any other player is still covered by network capture, embed‑page parsing, and player‑config detection (JW Player, Video.js, Flowplayer, Next.js and Nuxt page data). YouTube is not supported.</p>
+        </details>
+        <details>
           <summary>How do I convert the downloaded .ts file to MP4?</summary>
-          <p>HLS downloads save as MPEG‑TS (<code>.ts</code>); DASH downloads are already MP4. To convert a <code>.ts</code> file, use ffmpeg. A fast, lossless remux: <code>ffmpeg -i input.ts -c copy output.mp4</code>. This repackages the MPEG‑TS container into MP4 without re‑encoding, so it finishes in seconds and preserves original quality.</p>
+          <p>Classic HLS downloads save as MPEG‑TS (<code>.ts</code>); fMP4/CMAF HLS and DASH downloads are already MP4. To convert a <code>.ts</code> file, use ffmpeg. A fast, lossless remux: <code>ffmpeg -i input.ts -c copy output.mp4</code>. This repackages the MPEG‑TS container into MP4 without re‑encoding, so it finishes in seconds and preserves original quality.</p>
         </details>
         <details>
           <summary>Who built this?</summary>
@@ -1185,7 +1228,7 @@
       <h2>Save what you're<br><em>actually</em> watching.</h2>
       <p>Free. No account. No telemetry. Works on any Chromium browser.</p>
       <div class="hero-cta" style="justify-content:center">
-        <a class="btn btn-primary" href="https://github.com/ChiefInnovator/videodownloader/releases/latest" rel="noopener">Download v2.1.0</a>
+        <a class="btn btn-primary" href="https://github.com/ChiefInnovator/videodownloader/releases/latest" rel="noopener">Download v2.3.0</a>
         <a class="btn btn-secondary" href="https://github.com/ChiefInnovator/videodownloader" rel="noopener">Source on GitHub</a>
       </div>
     </div>

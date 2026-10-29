@@ -9,14 +9,19 @@ Detect, extract, and download video content from web pages for offline viewing �
 ## Features
 
 - Automatic detection of HTML5 video elements, HLS streams, DASH manifests, and network-level video responses
-- **Cross-origin iframe detection** — identifies video embeds from Medius, Vimeo, Mux, Wistia, Brightcove, and other platforms
+- **Cross-origin iframe detection** — identifies video embeds from Medius, Vimeo, Mux, Wistia, Brightcove, JW Player, Cloudflare Stream, Vidyard, Panopto, and other platforms
+- **Platform API resolution** — Vimeo, Wistia, JW Player, Mux, Cloudflare Stream, Vidyard, and Panopto embeds resolve through the platform's own player API (endpoints ported from [yt-dlp](https://github.com/yt-dlp/yt-dlp)), falling back to network capture and embed-page parsing
+- **fMP4 / CMAF HLS** — `#EXT-X-MAP` init segments are honored and the download saves as `.mp4`; `#EXT-X-BYTERANGE` segments are fetched with HTTP Range requests
+- **Signed-URL CDNs** — when segments or keys fail without it, the playlist's query-string token is carried onto same-origin segment and key URLs
+- **Resilient downloads** — up to 5 retries per segment with exponential backoff; a segment that stays unavailable is skipped and reported (never the first or an init segment, at most 10%); Anvato/Uplynk ad segments are dropped
+- **Player-config detection** — finds media URLs in JW Player / Video.js / Flowplayer setup code, Next.js and Nuxt page data, `<mux-player>` elements, JSON-LD `embedUrl`, `og:video:type`, and `twitter:player:stream`
 - **AES-128 stream decryption** — fetches encryption keys, decrypts segments, and assembles into a single file
 - **DASH (MPD) support** — parses adaptation sets and representations for quality selection
 - Quality selection for multi-variant HLS and multi-representation DASH
 - One-click download with real-time segment-level progress tracking
 - **Pause/resume/cancel** for stream assembly downloads
 - **Authentication forwarding** — propagates JWT tokens and session cookies to video platform APIs
-- **DRM detection** — warns users when Widevine/PlayReady/FairPlay prevents download
+- **DRM detection** — warns users when Widevine/PlayReady/FairPlay (incl. `skd://` and DRM `KEYFORMAT`s) or Adobe Access prevents download
 - Clean dark-themed popup UI with video thumbnails and metadata
 - Configurable default format, quality, and download location
 - SPA-compatible via MutationObserver for dynamically loaded content
@@ -44,6 +49,7 @@ videodownloader/
 │       ├── aes-decrypt.js            # AES-128-CBC decryption (Web Crypto API)
 │       ├── segment-downloader.js     # Segment fetch/decrypt/concat with retry
 │       ├── iframe-resolver.js        # Iframe classification, auth extraction, embed parsing
+│       ├── platform-resolvers.js     # Embed URL → manifest via Vimeo/Wistia/JW/Mux/Cloudflare/Vidyard/Panopto APIs
 │       └── page-context.js           # Video title + slide-deck links from every frame
 ├── icons/                            # Extension icons (16/48/128px)
 ├── scripts/
@@ -123,7 +129,10 @@ The [Release workflow](.github/workflows/release.yml) packages the extension and
 - **Cross-origin iframes** are resolved via embed page parsing and network interception (not DOM access)
 - **CORS-restricted manifests** may prevent quality expansion; the top-level URL still works
 - **Authenticated streams** require an active session — tokens are forwarded from the iframe URL and cookies
-- **TS output** — HLS streams are saved as `.ts` files; use VLC/mpv for playback or ffmpeg for MP4 conversion
+- **TS output** — classic (MPEG-TS) HLS streams are saved as `.ts` files; use VLC/mpv for playback or ffmpeg for MP4 conversion. fMP4/CMAF HLS saves as `.mp4`
+- **Separate HLS audio renditions** (`#EXT-X-MEDIA TYPE=AUDIO`) are not merged yet — the video variant is downloaded on its own
+- **Live HLS** — only the segments currently in the playlist window are captured
+- **YouTube** is not supported
 
 See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for full technical details, detection strategy, and edge cases.
 

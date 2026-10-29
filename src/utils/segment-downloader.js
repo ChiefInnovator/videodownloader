@@ -18,9 +18,14 @@ import {
 
 // ── Constants ───────────────────────────────────────────────────────
 
-const MAX_RETRIES = 3;
+const MAX_RETRIES = 5;
 const BASE_RETRY_DELAY_MS = 1000;
+const MAX_RETRY_DELAY_MS = 20000;
 const MAX_CONCURRENT = 6;
+// A segment that still fails after every retry is skipped (a brief glitch
+// in the output beats losing the whole download), unless it is required
+// (the first segment, init segments) or too many have been skipped.
+const MAX_SKIPPED_RATIO = 0.1;
 
 // ── Active jobs registry ────────────────────────────────────────────
 
@@ -44,7 +49,7 @@ const segmentBuffers = new Map();
  * @param {ArrayBuffer|null} opts.initSegment — DASH init segment (prepended to output)
  * @param {string}        opts.outputExt       — 'ts', 'mp4', etc.
  * @param {Function}      opts.keyFetcher      — async (keyUri) => ArrayBuffer
- * @param {Function}      opts.segmentFetcher  — async (url) => ArrayBuffer
+ * @param {Function}      opts.segmentFetcher  — async (url, range|null) => ArrayBuffer
  * @param {Function}      [opts.assemble]      — (buffers) => BlobPart[]; overrides plain concatenation
  * @param {Function}      opts.onProgress      — called with job state on every segment
  * @param {Function}      opts.onComplete      — called with final Blob
@@ -77,6 +82,8 @@ export function startSegmentDownload(opts) {
     state: 'running',
     totalSegments: segments.length,
     completedSegments: 0,
+    skippedSegments: 0,
+    useFallbackUrls: false,
     totalBytes: 0,
     startTime: Date.now(),
     error: '',
@@ -215,11 +222,14 @@ async function downloadOneSegment(index, spec, buffers, keyFetcher, segmentFetch
 
     try {
       // Fetch segment via strategy chain
-      let data = await segmentFetcher(spec.url);
+      let data = await fetchWithFallback(
+        (url) => segmentFetcher(url, spec.range || null),
+        spec.url, spec.fallbackUrl, job);
+      if (spec.range) data = clampToRange(data, spec.range);
 
       // Decrypt if AES-128
       if (spec.key?.method === 'AES-128' && spec.key.uri) {
-        const cryptoKey = await getOrFetchKey(spec.key.uri, keyFetcher, keyCache);
+        const cryptoKey = await getOrFetchKey(spec.key, keyFetcher, keyCache, job);
         const iv = spec.key.iv
           ? ivFromHex(spec.key.iv)
           : ivFromSequenceNumber(spec.sequence);
@@ -237,19 +247,57 @@ async function downloadOneSegment(index, spec, buffers, keyFetcher, segmentFetch
       lastError = err;
 
       if (attempt < MAX_RETRIES) {
-        const delay = BASE_RETRY_DELAY_MS * Math.pow(2, attempt);
+        const delay = Math.min(BASE_RETRY_DELAY_MS * Math.pow(2, attempt), MAX_RETRY_DELAY_MS);
         await sleep(delay, signal);
       }
     }
   }
 
+  const required = spec.required || index === 0;
+  const skipLimit = Math.max(1, Math.floor(job.totalSegments * MAX_SKIPPED_RATIO));
+  if (!required && job.skippedSegments < skipLimit) {
+    job.skippedSegments++;
+    job.onProgress(job);
+    return;
+  }
+
   throw lastError || new Error(`Segment ${index} failed after ${MAX_RETRIES} retries`);
 }
 
-async function getOrFetchKey(keyUri, keyFetcher, keyCache) {
+/**
+ * Fetch a URL; if it fails and a fallback (URL + playlist query token)
+ * exists, try that and use fallbacks for the rest of the job.
+ */
+async function fetchWithFallback(fetcher, url, fallbackUrl, job) {
+  if (fallbackUrl && job.useFallbackUrls) return fetcher(fallbackUrl);
+  try {
+    return await fetcher(url);
+  } catch (err) {
+    if (!fallbackUrl) throw err;
+    const data = await fetcher(fallbackUrl);
+    job.useFallbackUrls = true;
+    return data;
+  }
+}
+
+/**
+ * Servers that ignore Range send the whole resource (200); cut out the
+ * requested bytes. A 206 response already has the right length.
+ */
+function clampToRange(data, range) {
+  const m = /bytes=(\d+)-(\d+)/.exec(range);
+  if (!m) return data;
+  const start = Number(m[1]);
+  const end = Number(m[2]);
+  if (data.byteLength <= end - start + 1) return data;
+  return data.slice(start, end + 1);
+}
+
+async function getOrFetchKey(key, keyFetcher, keyCache, job) {
+  const keyUri = key.uri;
   if (keyCache.has(keyUri)) return keyCache.get(keyUri);
 
-  const rawKey = await keyFetcher(keyUri);
+  const rawKey = await fetchWithFallback(keyFetcher, keyUri, key.fallbackUri, job);
   if (rawKey.byteLength !== 16) {
     throw new Error(`Expected 16-byte key, got ${rawKey.byteLength} bytes`);
   }

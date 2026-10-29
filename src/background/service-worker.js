@@ -10,6 +10,7 @@ import { extFromUrl, extFromMime, filenameFromUrl, formatBytes } from '../utils/
 import {
   parseMasterPlaylist, parseMediaPlaylistDetailed,
   isMasterPlaylist, isHlsPlaylist, isAesEncrypted,
+  withQueryFallback,
 } from '../utils/hls-parser.js';
 import { parseMpd, isDashManifest } from '../utils/dash-parser.js';
 import {
@@ -25,6 +26,7 @@ import {
   getCookiesForUrl,
 } from '../utils/fetch-strategy.js';
 import { muxFragmentedMp4 } from '../utils/mp4-mux.js';
+import { resolveFromPlatformApi } from '../utils/platform-resolvers.js';
 
 // ── Network-level video detection ───────────────────────────────────
 
@@ -175,6 +177,17 @@ chrome.webRequest.onHeadersReceived.addListener(
  */
 function frameIdForUrl(tabId, url) {
   return networkManifests.get(tabId)?.get(url)?.frameId ?? null;
+}
+
+/** Frame whose document is `url` (e.g. a cross-origin embed iframe), or null. */
+async function frameIdForDocument(tabId, url) {
+  if (tabId == null) return null;
+  try {
+    const frames = await chrome.webNavigation.getAllFrames({ tabId });
+    return frames?.find(f => f.url === url)?.frameId ?? null;
+  } catch {
+    return null;
+  }
 }
 
 // Clean up when a tab closes.
@@ -407,6 +420,17 @@ async function expandDash(mpdUrl, authHeaders = {}, tabId = null) {
 async function resolveIframe(iframeUrl, tabId) {
   const authHeaders = await buildFullAuthHeaders(iframeUrl);
 
+  // Strategy 0: known platform (Vimeo, Wistia, JW Player, Mux, Cloudflare
+  // Stream, Vidyard, Panopto) — ask its player API for the manifest.
+  // Fetch from inside the embed's frame when we can find it, so the
+  // platform sees its own cookies and origin.
+  const frameId = await frameIdForDocument(tabId, iframeUrl);
+  const platform = await resolveFromPlatformApi(iframeUrl, (url) =>
+    fetchTextWithStrategy(url, 'manifest', { tabId, frameId, authHeaders }));
+  if (platform) {
+    return { manifests: platform.manifests, streamType: platform.streamType, authHeaders };
+  }
+
   // Strategy 1: Check if we already intercepted manifests from this origin
   const tabManifests = networkManifests.get(tabId);
   if (tabManifests) {
@@ -446,18 +470,38 @@ async function downloadHlsStream(opts) {
 
   const body = await fetchTextWithStrategy(variantUrl, 'manifest', { tabId, frameId, authHeaders });
   const playlist = parseMediaPlaylistDetailed(body, variantUrl);
+  if (playlist.hasDrm) {
+    throw new Error('This stream is DRM-protected and cannot be downloaded');
+  }
+  if (playlist.segments.length === 0) throw new Error('Playlist has no segments');
 
-  const ext = 'ts';
-  const finalFilename = filename || `video_${Date.now()}.${ext}`;
+  // fMP4 (CMAF) HLS: each EXT-X-MAP init segment goes in front of the
+  // media segments it applies to, and the output is MP4 rather than TS.
+  const segments = [];
+  let lastMap = null;
+  for (const seg of playlist.segments) {
+    if (seg.map && seg.map !== lastMap) {
+      segments.push({ ...seg.map, sequence: seg.sequence, key: null, required: true });
+    }
+    lastMap = seg.map;
+    segments.push({
+      url: seg.url,
+      fallbackUrl: seg.fallbackUrl,
+      range: seg.range,
+      sequence: seg.sequence,
+      key: seg.key,
+    });
+  }
+
+  const ext = playlist.isFmp4 ? 'mp4' : 'ts';
+  const finalFilename = filename
+    ? filename.replace(/\.ts$/i, `.${ext}`)
+    : `video_${Date.now()}.${ext}`;
 
   return new Promise((resolve, reject) => {
     startSegmentDownload({
       jobId,
-      segments: playlist.segments.map(seg => ({
-        url: seg.url,
-        sequence: seg.sequence,
-        key: seg.key,
-      })),
+      segments,
       initSegment: null,
       outputExt: ext,
       keyFetcher: fetchers.keyFetcher,
@@ -515,11 +559,14 @@ async function downloadDashStream(opts) {
     const entry = { initIndex: -1, start: 0, end: 0 };
     if (rep.initUrl) {
       entry.initIndex = segments.length;
-      segments.push({ url: rep.initUrl, sequence: segments.length, key: null });
+      segments.push({
+        ...withQueryFallback(rep.initUrl, mpdUrl),
+        sequence: segments.length, key: null, required: true,
+      });
     }
     entry.start = segments.length;
     for (const url of rep.segmentUrls) {
-      segments.push({ url, sequence: segments.length, key: null });
+      segments.push({ ...withQueryFallback(url, mpdUrl), sequence: segments.length, key: null });
     }
     entry.end = segments.length;
     return entry;
@@ -539,7 +586,7 @@ async function downloadDashStream(opts) {
       assemble: (buffers) => {
         const trackData = layout.map(l => ({
           init: l.initIndex >= 0 ? buffers[l.initIndex] : null,
-          segments: buffers.slice(l.start, l.end),
+          segments: buffers.slice(l.start, l.end).filter(Boolean), // skipped segments
         }));
         if (trackData.length === 1) {
           const [t] = trackData;

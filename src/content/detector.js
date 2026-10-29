@@ -34,10 +34,14 @@
     /\.sharepoint\.com$/i,              // SharePoint-hosted videos
     /player\.vimeo\.com$/i,
     /stream\.mux\.com$/i,
+    /^player\.mux\.com$/i,
     /fast\.wistia\.(com|net)$/i,
     /vidyard\.com$/i,
     /brightcove(cdn)?\.com$/i,
     /jwplatform\.com$/i,
+    /^cdn\.jwplayer\.com$/i,
+    /(^|\.)(cloudflarestream\.com|videodelivery\.net)$/i,
+    /\.panopto\.(com|eu)$/i,
     /kaltura\.com$/i,
     /cloudfront\.net$/i,
     /akamaihd\.net$/i,
@@ -59,6 +63,8 @@
     scanSourceElements();
     scanObjectEmbed();
     scanNetworkHints();
+    scanInlinePlayerConfigs();
+    scanMuxPlayers();
     scanYouTubeThumbnails();
     scanIframes();
     scanComplianzBlockedVideos();
@@ -119,12 +125,22 @@
    * og:video meta tags, and common JS player config patterns.
    */
   function scanNetworkHints() {
-    // og:video / og:video:url meta tags
+    // og:video / og:video:url meta tags. Trust an extension-less URL when
+    // og:video:type says it's a video file or HLS playlist.
+    const ogType = (document.querySelector('meta[property="og:video:type"]')?.content || '').toLowerCase();
+    const ogIsMedia = ogType.startsWith('video/') || ogType.includes('mpegurl');
     for (const meta of document.querySelectorAll(
       'meta[property="og:video"], meta[property="og:video:url"], meta[property="og:video:secure_url"]'
     )) {
       const url = meta.content;
-      if (url && isVideoUrl(url)) addSource(url, null);
+      if (url && (isVideoUrl(url) || ogIsMedia)) addSource(url, null, ogIsMedia ? ogType : undefined);
+    }
+
+    // Twitter player card stream
+    for (const meta of document.querySelectorAll(
+      'meta[name="twitter:player:stream"], meta[property="twitter:player:stream"]'
+    )) {
+      if (meta.content) addSource(meta.content, null);
     }
 
     // JSON-LD VideoObject
@@ -314,6 +330,57 @@
     }
   }
 
+  /**
+   * Player setup code and framework data blobs (JW Player setup({file}),
+   * Video.js src(), Flowplayer clips, Next.js __NEXT_DATA__, Nuxt
+   * __NUXT__) carry absolute media URLs in inline <script> text. Pick out
+   * quoted .m3u8/.mpd/.mp4/.webm URLs, JSON-escaped or not.
+   */
+  const INLINE_MEDIA_RE = /["'](https?:(?:\\?\/){2}[^"'\s<>]+?\.(?:m3u8|mpd|mp4|webm)(?:\?[^"'\s<>]*)?)["']/gi;
+  const MAX_INLINE_SCRIPT = 2_000_000;
+
+  function scanInlinePlayerConfigs() {
+    for (const script of document.querySelectorAll('script:not([src])')) {
+      const type = (script.type || '').toLowerCase();
+      if (type && !type.includes('javascript') && !type.includes('json') && type !== 'module') continue;
+      const text = script.textContent;
+      if (!text || text.length > MAX_INLINE_SCRIPT) continue;
+      INLINE_MEDIA_RE.lastIndex = 0;
+      let m;
+      while ((m = INLINE_MEDIA_RE.exec(text))) {
+        const url = m[1].replace(/\\\//g, '/').replace(/\\u0026/gi, '&');
+        if (isVideoUrl(url)) addSource(url, null);
+      }
+    }
+  }
+
+  /** <mux-player> / <mux-video> web components → Mux player embed. */
+  function scanMuxPlayers() {
+    for (const el of document.querySelectorAll('mux-player[playback-id], mux-video[playback-id]')) {
+      const [id, query] = el.getAttribute('playback-id').split('?');
+      if (!id) continue;
+      const token = el.getAttribute('playback-token') || new URLSearchParams(query || '').get('token');
+      const url = new URL(`https://player.mux.com/${id}`);
+      if (token) url.searchParams.set('playback-token', token);
+      addEmbed(url.href, el.getAttribute('metadata-video-title') || document.title || '', 'high');
+    }
+  }
+
+  function addEmbed(rawUrl, title, fallbackConfidence) {
+    const url = absoluteUrl(rawUrl);
+    if (!url || !/^https?:/i.test(url) || foundIframes.has(url)) return;
+    const classification = classifyIframeSrc(url);
+    foundIframes.set(url, {
+      url,
+      type: 'iframe-embed',
+      platform: extractPlatform(url),
+      confidence: classification.isVideo ? classification.confidence : fallbackConfidence,
+      title,
+      width: null,
+      height: null,
+    });
+  }
+
   function extractPlatform(url) {
     try { return new URL(url).hostname; } catch { return null; }
   }
@@ -346,8 +413,13 @@
   function extractJsonLdVideos(obj) {
     if (!obj || typeof obj !== 'object') return;
     if (Array.isArray(obj)) { obj.forEach(extractJsonLdVideos); return; }
-    if (obj['@type'] === 'VideoObject' && obj.contentUrl) {
-      addSource(obj.contentUrl, null);
+    const types = [].concat(obj['@type'] || []);
+    if (types.includes('VideoObject')) {
+      if (typeof obj.contentUrl === 'string') addSource(obj.contentUrl, null);
+      // embedUrl points at a player page — surface it like an iframe embed.
+      if (typeof obj.embedUrl === 'string') {
+        addEmbed(obj.embedUrl, obj.name || document.title || '', 'medium');
+      }
     }
     for (const v of Object.values(obj)) {
       if (v && typeof v === 'object') extractJsonLdVideos(v);
@@ -448,7 +520,10 @@
 
     // Strategy: content-script isolated world fetch (page cookies, extension CORS)
     if (msg.action === 'fetchResourceContentScript') {
-      fetch(msg.url, { credentials: 'include' })
+      fetch(msg.url, {
+        credentials: 'include',
+        headers: msg.range ? { Range: msg.range } : {},
+      })
         .then(res => {
           if (!res.ok) throw new Error(`${res.status}`);
           return res.arrayBuffer();

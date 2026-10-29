@@ -773,7 +773,8 @@ function updateStreamProgress(msg) {
   if (msg.state === 'complete') {
     els.fill.style.width = '100%';
     els.fill.classList.add('complete');
-    els.text.textContent = `Complete \u2014 ${formatBytes(msg.totalBytes)}`;
+    els.text.textContent = `Complete \u2014 ${formatBytes(msg.totalBytes)}` +
+      (msg.skippedSegments ? ` (${msg.skippedSegments} unavailable segment${msg.skippedSegments === 1 ? '' : 's'} skipped)` : '');
     els.btn.textContent = 'Saving\u2026';
     els.ctrl.innerHTML = '';
     streamProgressElements.delete(msg.jobId);
