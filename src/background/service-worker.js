@@ -179,14 +179,24 @@ function frameIdForUrl(tabId, url) {
   return networkManifests.get(tabId)?.get(url)?.frameId ?? null;
 }
 
-/** Frame whose document is `url` (e.g. a cross-origin embed iframe), or null. */
-async function frameIdForDocument(tabId, url) {
-  if (tabId == null) return null;
+/**
+ * Frames whose document is `url` (e.g. a cross-origin embed iframe) plus
+ * all their descendant frames. Empty when the frame can't be found.
+ * @returns {Promise<number[]>} the matching frame first
+ */
+async function framesForDocument(tabId, url) {
+  if (tabId == null) return [];
   try {
-    const frames = await chrome.webNavigation.getAllFrames({ tabId });
-    return frames?.find(f => f.url === url)?.frameId ?? null;
+    const frames = await chrome.webNavigation.getAllFrames({ tabId }) || [];
+    const ids = frames.filter(f => f.url === url).map(f => f.frameId);
+    for (let i = 0; i < ids.length; i++) {
+      for (const f of frames) {
+        if (f.parentFrameId === ids[i] && !ids.includes(f.frameId)) ids.push(f.frameId);
+      }
+    }
+    return ids;
   } catch {
-    return null;
+    return [];
   }
 }
 
@@ -424,22 +434,29 @@ async function resolveIframe(iframeUrl, tabId) {
   // Stream, Vidyard, Panopto) — ask its player API for the manifest.
   // Fetch from inside the embed's frame when we can find it, so the
   // platform sees its own cookies and origin.
-  const frameId = await frameIdForDocument(tabId, iframeUrl);
+  const embedFrames = await framesForDocument(tabId, iframeUrl);
+  const frameId = embedFrames[0] ?? null;
   const platform = await resolveFromPlatformApi(iframeUrl, (url) =>
     fetchTextWithStrategy(url, 'manifest', { tabId, frameId, authHeaders }));
   if (platform) {
     return { manifests: platform.manifests, streamType: platform.streamType, authHeaders };
   }
 
-  // Strategy 1: Check if we already intercepted manifests from this origin
+  // Strategy 1: manifests this embed already loaded — requested by its
+  // frame (or a frame inside it), or served from its origin. Manifests from
+  // other players on the page are excluded so one embed can't resolve to
+  // another's video.
   const tabManifests = networkManifests.get(tabId);
   if (tabManifests) {
     const iframeOrigin = new URL(iframeUrl).origin;
     const matchingManifests = [];
-    for (const [url] of tabManifests) {
+    for (const [url, info] of tabManifests) {
       if (SUB_RESOURCE_NAMES.test(url)) continue;
+      const sameOrigin = url.startsWith(iframeOrigin);
+      const fromEmbed = embedFrames.includes(info.frameId);
+      if (!sameOrigin && !fromEmbed) continue;
       // Same-origin manifests first; CDN manifests (e.g. akamaized.net) after
-      if (url.startsWith(iframeOrigin)) matchingManifests.unshift(url);
+      if (sameOrigin) matchingManifests.unshift(url);
       else matchingManifests.push(url);
     }
     if (matchingManifests.length > 0) {
@@ -468,8 +485,17 @@ async function downloadHlsStream(opts) {
   const frameId = frameIdForUrl(tabId, variantUrl);
   const fetchers = createFetcherSet(tabId, authHeaders, frameId);
 
-  const body = await fetchTextWithStrategy(variantUrl, 'manifest', { tabId, frameId, authHeaders });
-  const playlist = parseMediaPlaylistDetailed(body, variantUrl);
+  let mediaUrl = variantUrl;
+  let body = await fetchTextWithStrategy(variantUrl, 'manifest', { tabId, frameId, authHeaders });
+  // Single-variant streams have no quality picker, so the popup sends the
+  // master playlist itself — download its best variant.
+  if (isMasterPlaylist(body)) {
+    const [best] = parseMasterPlaylist(body, variantUrl);
+    if (!best) throw new Error('Master playlist has no variants');
+    mediaUrl = best.url;
+    body = await fetchTextWithStrategy(mediaUrl, 'manifest', { tabId, frameId, authHeaders });
+  }
+  const playlist = parseMediaPlaylistDetailed(body, mediaUrl);
   if (playlist.hasDrm) {
     throw new Error('This stream is DRM-protected and cannot be downloaded');
   }
@@ -481,7 +507,7 @@ async function downloadHlsStream(opts) {
   let lastMap = null;
   for (const seg of playlist.segments) {
     if (seg.map && seg.map !== lastMap) {
-      segments.push({ ...seg.map, sequence: seg.sequence, key: null, required: true });
+      segments.push({ ...seg.map, sequence: seg.sequence, required: true });
     }
     lastMap = seg.map;
     segments.push({

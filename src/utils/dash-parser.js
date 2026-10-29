@@ -170,6 +170,7 @@ function resolveSegments(rep, adaptationSet, period, mpd, baseUrl) {
     const bandwidth = rep.attrs.bandwidth || '0';
     const startNumber = parseInt(tmplAttrs.startNumber || '1', 10);
     const timescale = parseInt(tmplAttrs.timescale || '1', 10);
+    const presentationTimeOffset = parseInt(tmplAttrs.presentationTimeOffset || '0', 10) || 0;
     const totalDuration = parseDuration(
       period.attrs.duration || mpd.attrs.mediaPresentationDuration || ''
     );
@@ -199,7 +200,7 @@ function resolveSegments(rep, adaptationSet, period, mpd, baseUrl) {
         // r < 0: repeat until the next S@t or the end of the period
         if (r < 0 && d > 0) {
           const nextT = parseInt(entries[idx + 1]?.attrs.t, 10);
-          const end = !isNaN(nextT) ? nextT : totalDuration * timescale;
+          const end = !isNaN(nextT) ? nextT : presentationTimeOffset + totalDuration * timescale;
           r = Math.max(0, Math.ceil((end - time) / d) - 1);
         }
 

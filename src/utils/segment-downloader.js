@@ -83,6 +83,7 @@ export function startSegmentDownload(opts) {
     totalSegments: segments.length,
     completedSegments: 0,
     skippedSegments: 0,
+    skippedIndices: new Set(),
     useFallbackUrls: false,
     totalBytes: 0,
     startTime: Date.now(),
@@ -96,8 +97,11 @@ export function startSegmentDownload(opts) {
 
   const keyCache = new Map();
 
-  runPipeline(jobId, segments, buffers, initSegment, outputExt, assemble,
-    keyFetcher, segmentFetcher, keyCache, controller, job, onComplete, onError);
+  // Kept on the job so resume can re-run the pipeline; segments already in
+  // `buffers` are skipped.
+  job.restart = (ctrl) => runPipeline(jobId, segments, buffers, initSegment, outputExt, assemble,
+    keyFetcher, segmentFetcher, keyCache, ctrl, job, onComplete, onError);
+  job.restart(controller);
 
   return jobId;
 }
@@ -123,6 +127,7 @@ export function resumeDownload(jobId) {
   const controller = new AbortController();
   abortControllers.set(jobId, controller);
   job.onProgress(job);
+  job.restart(controller);
 }
 
 /**
@@ -158,7 +163,8 @@ async function runPipeline(
   try {
     await downloadAllSegments(segments, buffers, keyFetcher, segmentFetcher, keyCache, controller.signal, job);
 
-    if (job.state === 'paused') return;
+    // Paused, or superseded by a resumed pipeline: that one finishes the job.
+    if (job.state === 'paused' || controller.signal.aborted) return;
 
     // Assemble final blob
     let parts = [];
@@ -181,7 +187,7 @@ async function runPipeline(
     segmentBuffers.delete(jobId);
     abortControllers.delete(jobId);
   } catch (err) {
-    if (err.name === 'AbortError' && job.state === 'paused') return;
+    if (err.name === 'AbortError' && controller.signal.aborted) return;
     job.state = 'error';
     job.error = err.message;
     job.onProgress(job);
@@ -200,7 +206,7 @@ async function downloadAllSegments(segments, buffers, keyFetcher, segmentFetcher
       if (signal.aborted) throw new DOMException('Download paused', 'AbortError');
       const index = cursor++;
       if (index >= segments.length) return;
-      if (buffers[index]) continue;
+      if (buffers[index] || job.skippedIndices.has(index)) continue;
       try {
         await downloadOneSegment(index, segments[index], buffers, keyFetcher, segmentFetcher, keyCache, signal, job);
       } catch (err) {
@@ -236,10 +242,14 @@ async function downloadOneSegment(index, spec, buffers, keyFetcher, segmentFetch
         data = await decryptSegment(data, cryptoKey, iv);
       }
 
-      buffers[index] = data;
-      job.completedSegments++;
-      job.totalBytes += data.byteLength;
-      job.onProgress(job);
+      // A fetch from before a pause can land after the resumed pipeline
+      // already fetched the same segment — count it once.
+      if (!buffers[index]) {
+        buffers[index] = data;
+        job.completedSegments++;
+        job.totalBytes += data.byteLength;
+        job.onProgress(job);
+      }
       return;
 
     } catch (err) {
@@ -257,6 +267,7 @@ async function downloadOneSegment(index, spec, buffers, keyFetcher, segmentFetch
   const skipLimit = Math.max(1, Math.floor(job.totalSegments * MAX_SKIPPED_RATIO));
   if (!required && job.skippedSegments < skipLimit) {
     job.skippedSegments++;
+    job.skippedIndices.add(index);
     job.onProgress(job);
     return;
   }
