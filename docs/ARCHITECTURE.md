@@ -77,7 +77,9 @@ Rendered when the user clicks the extension icon:
 - Queries both content script (`getVideos`) and service worker (`getNetworkVideos`) in parallel.
 - Deduplicates direct videos by URL and renders video cards with thumbnail, metadata badges, and download button.
 - Renders a separate **"Embedded Streams"** section for detected iframes, each with a **Resolve Stream** button.
-- On resolve: calls the service worker to extract manifest URLs, shows DRM warnings if applicable, or populates a quality dropdown with available variants.
+- On resolve: calls the service worker to extract manifest URLs, shows DRM warnings if applicable, or populates a quality dropdown with available variants. DASH streams with a separate audio track also get an **Audio only (.m4a)** entry; the service worker then downloads just that representation and saves it as `audio/mp4`.
+- Each detected video has a **Copy link** button (`navigator.clipboard`) for its direct or manifest URL.
+- Transitions and animations are disabled under `prefers-reduced-motion: reduce`.
 - For stream downloads: shows segment-level progress (e.g., "Segment 42/128 (33%) — 2.4 MB/s — 1m left") with **Pause**, **Resume**, and **Cancel** controls.
 - For direct downloads: shows byte-level progress via `chrome.downloads` polling.
 
