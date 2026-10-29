@@ -27,6 +27,8 @@ const KNOWN_VIDEO_DOMAINS = [
   /kaltura\.com$/i,
   /cloudfront\.net$/i,       // many CDNs host video players here
   /akamaihd\.net$/i,
+  /akamaized\.net$/i,
+  /(^|\.)on24\.com$/i,
   /cdn\.embedly\.com$/i,
   /embed\.api\.video$/i,
   /iframe\.mediadelivery\.net$/i, // Bunny.net

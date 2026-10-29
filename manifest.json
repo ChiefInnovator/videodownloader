@@ -9,13 +9,16 @@
     "activeTab",
     "cookies",
     "downloads",
+    "offscreen",
     "scripting",
     "storage",
     "webRequest",
     "webNavigation"
   ],
   "host_permissions": [
-    "<all_urls>"
+    "<all_urls>",
+    "*://*.on24.com/*",
+    "*://*.akamaized.net/*"
   ],
   "background": {
     "service_worker": "src/background/service-worker.js",
