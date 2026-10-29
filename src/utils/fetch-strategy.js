@@ -59,9 +59,12 @@ const STRATEGIES = [
       const results = await chrome.scripting.executeScript({
         target,
         world: 'MAIN',
-        func: async (fetchUrl) => {
+        func: async (fetchUrl, range) => {
           try {
-            const res = await fetch(fetchUrl, { credentials: 'include' });
+            const res = await fetch(fetchUrl, {
+              credentials: 'include',
+              headers: range ? { Range: range } : {},
+            });
             if (!res.ok) throw new Error(`${res.status} ${res.statusText}`);
             const bytes = new Uint8Array(await res.arrayBuffer());
             // Results are JSON-serialized, so send base64 — a per-byte
@@ -76,7 +79,7 @@ const STRATEGIES = [
             return { error: err.message };
           }
         },
-        args: [url],
+        args: [url, ctx.range || null],
       });
 
       const result = results?.[0]?.result;
@@ -94,6 +97,7 @@ const STRATEGIES = [
       const response = await chrome.tabs.sendMessage(ctx.tabId, {
         action: 'fetchResourceContentScript',
         url,
+        range: ctx.range || null,
       }, ctx.frameId != null ? { frameId: ctx.frameId } : undefined);
       if (response?.error) throw new Error(response.error);
       if (response?.b64) return base64ToArrayBuffer(response.b64);
@@ -106,6 +110,7 @@ const STRATEGIES = [
     available: () => true,
     execute: async (url, ctx) => {
       const headers = { ...(ctx.authHeaders || {}) };
+      if (ctx.range) headers.Range = ctx.range;
       if (!headers.Cookie) {
         const cookies = await getCookiesForUrl(url);
         if (cookies.length) {
@@ -122,7 +127,7 @@ const STRATEGIES = [
     available: () => true,
     execute: async (url, ctx) => {
       const res = await fetch(url, {
-        headers: ctx.authHeaders || {},
+        headers: ctx.range ? { ...(ctx.authHeaders || {}), Range: ctx.range } : (ctx.authHeaders || {}),
         credentials: 'include',
         signal: ctx.signal,
       });
@@ -172,7 +177,7 @@ export function clearCache(domain) {
  *
  * @param {string} url
  * @param {'manifest'|'key'|'segment'} operationType
- * @param {{ tabId: number|null, frameId?: number|null, authHeaders?: HeadersInit, signal?: AbortSignal }} context
+ * @param {{ tabId: number|null, frameId?: number|null, authHeaders?: HeadersInit, signal?: AbortSignal, range?: string|null }} context
  * @returns {Promise<ArrayBuffer>}
  */
 export async function fetchWithStrategy(url, operationType, context) {
@@ -242,7 +247,8 @@ export function createFetcherSet(tabId, authHeaders = {}, frameId = null) {
   return {
     manifestFetcher: (url) => fetchWithStrategy(url, 'manifest', ctx),
     keyFetcher: (url) => fetchWithStrategy(url, 'key', ctx),
-    segmentFetcher: (url) => fetchWithStrategy(url, 'segment', ctx),
+    segmentFetcher: (url, range = null) =>
+      fetchWithStrategy(url, 'segment', range ? { ...ctx, range } : ctx),
   };
 }
 
