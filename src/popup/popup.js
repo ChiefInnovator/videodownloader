@@ -7,6 +7,7 @@
  */
 
 import { formatBytes, qualityLabel, extFromUrl, extFromMime, filenameFromUrl } from '../utils/formats.js';
+import { collectPageContext, pickPageTitle, mergeSlides, safeFilename, isGenericName } from '../utils/page-context.js';
 
 // ── DOM refs ────────────────────────────────────────────────────────
 
@@ -17,6 +18,14 @@ const emptyEl = document.getElementById('empty-state');
 const statusEl = document.getElementById('status');
 const btnSettings = document.getElementById('btn-settings');
 const btnRescan = document.getElementById('btn-rescan');
+const slidesSection = document.getElementById('slides-section');
+const slidesListEl = document.getElementById('slides-list');
+
+/** Title and slide decks for the active tab (see page-context.js). */
+let pageContext = { title: '', slides: [] };
+
+/** Slide URLs already downloaded while this popup is open. */
+const downloadedSlides = new Set();
 
 /** @type {Map<number, HTMLElement>} downloadId → progress DOM elements */
 const progressElements = new Map();
@@ -57,6 +66,8 @@ async function loadVideos() {
   listEl.innerHTML = '';
   iframeListEl.innerHTML = '';
   iframeSection.classList.add('hidden');
+  slidesListEl.innerHTML = '';
+  slidesSection.classList.add('hidden');
   emptyEl.classList.add('hidden');
 
   const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
@@ -70,6 +81,7 @@ async function loadVideos() {
     chrome.tabs.sendMessage(tab.id, { action: 'getVideos' }),
     chrome.runtime.sendMessage({ action: 'getNetworkVideos', tabId: tab.id }),
   ]);
+  pageContext = await loadPageContext(tab.id);
 
   const contentVideos = contentResult.status === 'fulfilled' ? contentResult.value?.videos || [] : [];
   const contentIframes = contentResult.status === 'fulfilled' ? contentResult.value?.iframes || [] : [];
@@ -100,8 +112,9 @@ async function loadVideos() {
   }
 
   const totalCount = directVideos.length + iframes.length;
+  const slideCount = pageContext.slides.length;
 
-  if (totalCount === 0) {
+  if (totalCount === 0 && slideCount === 0) {
     showEmpty();
     return;
   }
@@ -110,7 +123,13 @@ async function loadVideos() {
   const parts = [];
   if (directVideos.length > 0) parts.push(`${directVideos.length} video${directVideos.length > 1 ? 's' : ''}`);
   if (iframes.length > 0) parts.push(`${iframes.length} embedded stream${iframes.length > 1 ? 's' : ''}`);
+  if (slideCount > 0) parts.push(`${slideCount} slide deck${slideCount > 1 ? 's' : ''}`);
   statusEl.textContent = parts.join(', ') + ' found';
+
+  if (slideCount > 0) {
+    slidesSection.classList.remove('hidden');
+    pageContext.slides.forEach((slide, idx) => renderSlideItem(slide, idx, tab.id));
+  }
 
   // Render direct videos
   directVideos.forEach((video, idx) => renderVideoItem(video, idx, tab.id));
@@ -120,6 +139,19 @@ async function loadVideos() {
     iframeSection.classList.remove('hidden');
     iframes.forEach((iframe, idx) => renderIframeItem(iframe, idx, tab.id));
   }
+}
+
+/** Collect the video title and slide links from every frame of the tab. */
+async function loadPageContext(tabId) {
+  let frames = [];
+  try {
+    const results = await chrome.scripting.executeScript({
+      target: { tabId, allFrames: true },
+      func: collectPageContext,
+    });
+    frames = results.map(r => r.result).filter(Boolean);
+  } catch { /* restricted page — no context */ }
+  return { title: pickPageTitle(frames), slides: mergeSlides(frames) };
 }
 
 function showEmpty(msg) {
@@ -137,10 +169,13 @@ function renderVideoItem(video, idx, tabId) {
   const ext = isPending ? '' : (extFromUrl(video.url) || extFromMime(video.mime) || 'mp4');
   const quality = qualityLabel(video.width, video.height);
   const size = video.size ? formatBytes(video.size) : '';
-  const title = video.title || (isPending ? 'Video (not yet playing)' : filenameFromUrl(video.url, ext));
   const isHls = video.streamType === 'hls' || (!video.streamType && ext === 'm3u8');
   const isDash = video.streamType === 'dash' || (!video.streamType && ext === 'mpd');
   const isStream = isHls || isDash;
+  const title = video.title
+    || (isPending ? 'Video (not yet playing)' : '')
+    || (isStream && pageContext.title)
+    || filenameFromUrl(video.url, ext);
   const itemId = `vid-${idx}`;
 
   if (isStream) li.classList.add('stream-item');
@@ -443,9 +478,13 @@ async function onDirectDownload(video, itemId, tabId) {
   const progressWrap = document.getElementById(`progress-${itemId}`);
   progressWrap.classList.add('active');
 
+  downloadSlides(tabId);
+
   try {
     const ext = extFromUrl(video.url) || extFromMime(video.mime) || 'mp4';
-    const filename = filenameFromUrl(video.url, ext);
+    const urlName = filenameFromUrl(video.url, ext);
+    const titled = safeFilename(pageContext.title);
+    const filename = titled && isGenericName(urlName) ? `${titled}.${ext}` : urlName;
 
     const result = await chrome.runtime.sendMessage({
       action: 'download',
@@ -496,9 +535,13 @@ async function onStreamDownload(video, itemId, tabId, streamType) {
   progressWrap.classList.add('active');
 
   const jobId = `stream_${Date.now()}_${itemId}`;
-  const title = video.title || 'video';
-  const safeTitle = title.replace(/[^a-zA-Z0-9_\-. ]/g, '_').substring(0, 60);
-  const filename = `${safeTitle}_${Date.now()}.${streamType === 'dash' ? 'mp4' : 'ts'}`;
+  const ext = streamType === 'dash' ? 'mp4' : 'ts';
+  // Prefer the session/page title ("GH-300 Tech Prep.mp4"); chrome.downloads
+  // uniquifies duplicates, so the timestamp is only needed for the fallback.
+  const titled = safeFilename(pageContext.title || video.title);
+  const filename = titled ? `${titled}.${ext}` : `video_${Date.now()}.${ext}`;
+
+  downloadSlides(tabId);
 
   // Register stream progress tracking
   streamProgressElements.set(jobId, {
@@ -540,6 +583,71 @@ async function onStreamDownload(video, itemId, tabId, streamType) {
     btn.textContent = 'Retry';
     showProgressError(itemId, err.message);
   }
+}
+
+// ── Slides ──────────────────────────────────────────────────────────
+
+function slideFilename(slide) {
+  const titled = safeFilename(pageContext.title);
+  if (!titled) return slide.file;
+  const suffix = pageContext.slides.length > 1 ? safeFilename(slide.label) || 'Slides' : 'Slides';
+  return `${titled} - ${suffix}.${slide.ext}`;
+}
+
+async function downloadSlide(slide, tabId) {
+  if (downloadedSlides.has(slide.url)) return;
+  downloadedSlides.add(slide.url);
+  try {
+    const result = await chrome.runtime.sendMessage({
+      action: 'download',
+      url: slide.url,
+      filename: slideFilename(slide),
+      keepExtension: true,
+      tabId,
+    });
+    if (result?.error) throw new Error(result.error);
+    markSlideDownloaded(slide.url, 'Downloaded');
+  } catch (err) {
+    downloadedSlides.delete(slide.url);
+    markSlideDownloaded(slide.url, 'Retry', err.message);
+  }
+}
+
+/** Download every detected slide deck alongside a video download. */
+function downloadSlides(tabId) {
+  for (const slide of pageContext.slides) downloadSlide(slide, tabId);
+}
+
+function markSlideDownloaded(url, label, error) {
+  const btn = slidesListEl.querySelector(`[data-slide-url="${CSS.escape(url)}"]`);
+  if (!btn) return;
+  btn.textContent = label;
+  btn.disabled = label === 'Downloaded';
+  btn.title = error || '';
+}
+
+function renderSlideItem(slide, idx, tabId) {
+  const li = document.createElement('li');
+  li.className = 'video-item';
+  const name = slideFilename(slide);
+  li.innerHTML = `
+    <div class="video-info">
+      <div class="video-thumb-placeholder">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+             stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+             <polyline points="14 2 14 8 20 8"/></svg>
+      </div>
+      <div class="video-details">
+        <div class="video-title" title="${escapeAttr(name)}">${escapeHtml(truncate(name, 50))}</div>
+        <div class="video-meta"><span class="badge">${escapeHtml(slide.ext.toUpperCase())}</span><span>${escapeHtml(truncate(slide.label, 30))}</span></div>
+      </div>
+    </div>
+    <div class="video-actions">
+      <button type="button" class="btn btn-primary btn-download" data-slide-url="${escapeAttr(slide.url)}">Download</button>
+    </div>
+  `;
+  slidesListEl.appendChild(li);
+  li.querySelector('.btn-download').addEventListener('click', () => downloadSlide(slide, tabId));
 }
 
 // ── Stream pause / resume / cancel ──────────────────────────────────

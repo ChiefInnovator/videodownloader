@@ -28,6 +28,7 @@ Video Downloader is a Chrome Manifest V3 extension with six main components:
                  • aes-decrypt.js
                  • segment-downloader.js
                  • iframe-resolver.js
+                 • page-context.js
                  • formats.js
 ```
 
@@ -96,6 +97,7 @@ Persists user preferences to `chrome.storage.sync`:
 | `dash-parser.js` | MPD XML parser — periods, adaptation sets, representations, SegmentTemplate/SegmentList/SegmentTimeline resolution, ISO 8601 duration parsing, ContentProtection DRM detection |
 | `aes-decrypt.js` | AES-128-CBC decryption via Web Crypto API — key import, segment decrypt, IV derivation from sequence number or hex string, authenticated key fetch |
 | `segment-downloader.js` | Parallel segment fetcher with AES-128 decrypt pipeline, 3-retry exponential backoff, pause/resume via AbortController, progress callbacks, blob assembly |
+| `page-context.js` | Injected into every frame by the popup: picks the video title (modal title → player frame title → page title), finds slide-deck links (PPT/Key/ODP, or PDFs labelled slides/deck/presentation), and builds safe filenames |
 | `iframe-resolver.js` | Iframe URL classification (domain allow-list + path keywords), JWT/OAuth token extraction, session cookie forwarding, embed page HTML parsing for manifest URLs, DRM indicator detection |
 
 ## Detection Strategy
