@@ -21,9 +21,10 @@ import {
   cancelDownload, getJobState, listJobs,
 } from '../utils/segment-downloader.js';
 import {
-  createFetcherSet, fetchWithStrategy, fetchTextWithStrategy,
+  createFetcherSet, fetchTextWithStrategy,
   getCookiesForUrl,
 } from '../utils/fetch-strategy.js';
+import { muxFragmentedMp4 } from '../utils/mp4-mux.js';
 
 // ── Network-level video detection ───────────────────────────────────
 
@@ -35,8 +36,9 @@ const networkVideos = new Map();
 
 /**
  * Per-tab map of manifest URLs discovered via network interception.
- * These are .m3u8 / .mpd URLs from iframe origins.
- * @type {Map<number, Map<string, string>>}
+ * These are .m3u8 / .mpd URLs, including ones requested by cross-origin
+ * iframes (frameId records which frame asked for them).
+ * @type {Map<number, Map<string, { contentType: string, frameId: number, streamType: 'hls'|'dash' }>>}
  */
 const networkManifests = new Map();
 
@@ -47,6 +49,9 @@ const VIDEO_CONTENT_TYPES = [
 
 const VIDEO_URL_RE = /\.(mp4|webm|ogv|mkv|m3u8|mpd)(\?|#|$)/i;
 const MANIFEST_URL_RE = /\.(m3u8|mpd)(\?|#|$)/i;
+const DASH_URL_RE = /\.mpd(\?|#|$)/i;
+const HLS_MIME_RE = /mpegurl/i;
+const DASH_MIME_RE = /dash\+xml/i;
 const SEGMENT_URL_RE = /\.(ts|m4s|m4v|m4a|m4i)(\?|#|$)/i;
 const KEY_URL_RE = /\.(key|bin)(\?|#|$)/i;
 const INIT_SEGMENT_RE = /\.(m4i|m4s|m4v|m4a)(\?|#|$)/i;
@@ -57,61 +62,110 @@ const INIT_SEGMENT_RE = /\.(m4i|m4s|m4v|m4a)(\?|#|$)/i;
  */
 const SUB_RESOURCE_NAMES = /\/(index|chunklist|media|segment|init|initSection)\d*\.m3u8(\?|#|$)/i;
 
+/** 'dash' | 'hls' | null for a request URL + content type. */
+function streamTypeOf(url, contentType = '') {
+  if (DASH_URL_RE.test(url) || DASH_MIME_RE.test(contentType)) return 'dash';
+  if (MANIFEST_URL_RE.test(url) || HLS_MIME_RE.test(contentType)) return 'hls';
+  return null;
+}
+
+/**
+ * Record a video/manifest request seen by webRequest. Requests made by
+ * cross-origin iframes (e.g. an ON24 player) carry the top tab's tabId,
+ * so they land in the same per-tab maps as the page's own requests.
+ */
+function recordNetworkVideo(details, contentType = '', contentLength = null) {
+  if (details.tabId < 0) return;
+
+  const isVideoMime = VIDEO_CONTENT_TYPES.some(t =>
+    contentType.toLowerCase().includes(t));
+  const isVideoExt = VIDEO_URL_RE.test(details.url);
+  const streamType = streamTypeOf(details.url, contentType);
+  const isManifest = streamType !== null;
+
+  if (!isVideoMime && !isVideoExt) return;
+
+  // Track manifests separately for iframe resolution
+  if (isManifest) {
+    if (!networkManifests.has(details.tabId)) {
+      networkManifests.set(details.tabId, new Map());
+    }
+    const manifests = networkManifests.get(details.tabId);
+    const prev = manifests.get(details.url);
+    manifests.set(details.url, {
+      contentType: contentType || prev?.contentType || '',
+      frameId: details.frameId ?? prev?.frameId ?? 0,
+      streamType,
+    });
+  }
+
+  // Track videos
+  if (!networkVideos.has(details.tabId)) {
+    networkVideos.set(details.tabId, new Map());
+  }
+  const tabMap = networkVideos.get(details.tabId);
+
+  // Skip individual segments, init segments, keys, and sub-resource playlists
+  if (SEGMENT_URL_RE.test(details.url) || KEY_URL_RE.test(details.url)) return;
+  if (INIT_SEGMENT_RE.test(details.url)) return;
+  if (SUB_RESOURCE_NAMES.test(details.url)) return;
+
+  const existing = tabMap.get(details.url);
+  if (!existing) {
+    tabMap.set(details.url, {
+      url: details.url,
+      type: isManifest ? 'stream' : 'direct',
+      streamType,
+      frameId: details.frameId ?? 0,
+      mime: contentType.split(';')[0].trim() || null,
+      size: contentLength ? parseInt(contentLength, 10) : null,
+      width: null,
+      height: null,
+      duration: null,
+      poster: null,
+      title: '',
+    });
+  } else {
+    // Fill in what onBeforeRequest could not know
+    if (!existing.mime && contentType) existing.mime = contentType.split(';')[0].trim();
+    if (!existing.size && contentLength) existing.size = parseInt(contentLength, 10);
+    if (isManifest) {
+      existing.type = 'stream';
+      existing.streamType = streamType;
+    }
+  }
+
+  updateBadge(details.tabId);
+}
+
+// URL-based detection: catch .mpd / .m3u8 as soon as they are requested,
+// from any frame, even if response headers never reach us.
+chrome.webRequest.onBeforeRequest.addListener(
+  (details) => {
+    if (MANIFEST_URL_RE.test(details.url)) recordNetworkVideo(details);
+  },
+  { urls: ['<all_urls>'] },
+);
+
+// Header-based detection: video MIME types and manifests without a
+// telltale extension (e.g. application/dash+xml served from an API path).
 chrome.webRequest.onHeadersReceived.addListener(
   (details) => {
-    if (details.tabId < 0) return;
-
-    const contentType = details.responseHeaders
-      ?.find(h => h.name.toLowerCase() === 'content-type')?.value || '';
-
-    const isVideoMime = VIDEO_CONTENT_TYPES.some(t =>
-      contentType.toLowerCase().includes(t));
-    const isVideoExt = VIDEO_URL_RE.test(details.url);
-    const isManifest = MANIFEST_URL_RE.test(details.url);
-
-    if (!isVideoMime && !isVideoExt) return;
-
-    const contentLength = details.responseHeaders
-      ?.find(h => h.name.toLowerCase() === 'content-length')?.value;
-
-    // Track manifests separately for iframe resolution
-    if (isManifest) {
-      if (!networkManifests.has(details.tabId)) {
-        networkManifests.set(details.tabId, new Map());
-      }
-      networkManifests.get(details.tabId).set(details.url, contentType);
-    }
-
-    // Track videos
-    if (!networkVideos.has(details.tabId)) {
-      networkVideos.set(details.tabId, new Map());
-    }
-    const tabMap = networkVideos.get(details.tabId);
-
-    // Skip individual segments, init segments, keys, and sub-resource playlists
-    if (SEGMENT_URL_RE.test(details.url) || KEY_URL_RE.test(details.url)) return;
-    if (INIT_SEGMENT_RE.test(details.url)) return;
-    if (SUB_RESOURCE_NAMES.test(details.url)) return;
-
-    if (!tabMap.has(details.url)) {
-      tabMap.set(details.url, {
-        url: details.url,
-        type: isManifest ? 'stream' : 'direct',
-        mime: contentType.split(';')[0].trim() || null,
-        size: contentLength ? parseInt(contentLength, 10) : null,
-        width: null,
-        height: null,
-        duration: null,
-        poster: null,
-        title: '',
-      });
-    }
-
-    updateBadge(details.tabId);
+    const header = (name) => details.responseHeaders
+      ?.find(h => h.name.toLowerCase() === name)?.value;
+    recordNetworkVideo(details, header('content-type') || '', header('content-length'));
   },
   { urls: ['<all_urls>'] },
   ['responseHeaders'],
 );
+
+/**
+ * Frame that originally requested a manifest, so fetches can run inside
+ * that (possibly cross-origin) iframe with its cookies and CORS context.
+ */
+function frameIdForUrl(tabId, url) {
+  return networkManifests.get(tabId)?.get(url)?.frameId ?? null;
+}
 
 // Clean up when a tab closes.
 chrome.tabs.onRemoved.addListener((tabId) => {
@@ -186,6 +240,7 @@ chrome.downloads.onChanged.addListener((delta) => {
     update.state = delta.state.current;
     if (delta.state.current === 'complete' || delta.state.current === 'interrupted') {
       activeDownloads.delete(delta.id);
+      if (info.blobUrl) revokeBlobUrl(info.blobUrl);
     }
   }
 
@@ -214,6 +269,69 @@ setInterval(async () => {
   }
 }, 500);
 
+// ── Blob downloads via offscreen document ───────────────────────────
+// MV3 service workers have no URL.createObjectURL, so assembled streams
+// are handed to an offscreen document that mints the blob: URL.
+
+const OFFSCREEN_PATH = 'src/offscreen/offscreen.html';
+let offscreenCreating = null;
+
+async function findOffscreenClient() {
+  const url = chrome.runtime.getURL(OFFSCREEN_PATH);
+  const all = await self.clients.matchAll({ includeUncontrolled: true });
+  return all.find(c => c.url === url) || null;
+}
+
+async function getOffscreenClient() {
+  let client = await findOffscreenClient();
+  if (client) return client;
+
+  if (!offscreenCreating) {
+    offscreenCreating = chrome.offscreen.createDocument({
+      url: OFFSCREEN_PATH,
+      reasons: ['BLOBS'],
+      justification: 'Create blob URLs for assembled stream downloads',
+    }).catch((err) => {
+      // A concurrent call may already have created it
+      if (!/single offscreen/i.test(err.message)) throw err;
+    }).finally(() => { offscreenCreating = null; });
+  }
+  await offscreenCreating;
+
+  client = await findOffscreenClient();
+  if (!client) throw new Error('Offscreen document unavailable');
+  return client;
+}
+
+/** Save an in-memory Blob through chrome.downloads. */
+async function saveBlob(blob, filename, tabId) {
+  const client = await getOffscreenClient();
+  const blobUrl = await new Promise((resolve, reject) => {
+    const { port1, port2 } = new MessageChannel();
+    port1.onmessage = ({ data }) => {
+      port1.close();
+      if (data?.error) reject(new Error(data.error));
+      else resolve(data.url);
+    };
+    client.postMessage({ type: 'createObjectURL', blob }, [port2]);
+  });
+
+  try {
+    const downloadId = await startSimpleDownload(blobUrl, filename, tabId);
+    const info = activeDownloads.get(downloadId);
+    if (info) info.blobUrl = blobUrl;
+    return downloadId;
+  } catch (err) {
+    revokeBlobUrl(blobUrl);
+    throw err;
+  }
+}
+
+async function revokeBlobUrl(url) {
+  const client = await findOffscreenClient().catch(() => null);
+  client?.postMessage({ type: 'revokeObjectURL', url });
+}
+
 // ── Auth forwarding ─────────────────────────────────────────────────
 // getCookiesForUrl is now imported from fetch-strategy.js
 
@@ -230,7 +348,7 @@ async function buildFullAuthHeaders(platformUrl) {
 
 async function expandHls(masterUrl, authHeaders = {}, tabId = null) {
   try {
-    const ctx = { tabId, authHeaders };
+    const ctx = { tabId, frameId: frameIdForUrl(tabId, masterUrl), authHeaders };
     const body = await fetchTextWithStrategy(masterUrl, 'manifest', ctx);
 
     if (!isHlsPlaylist(body)) return { variants: [], encrypted: false };
@@ -262,7 +380,7 @@ async function expandHls(masterUrl, authHeaders = {}, tabId = null) {
 
 async function expandDash(mpdUrl, authHeaders = {}, tabId = null) {
   try {
-    const ctx = { tabId, authHeaders };
+    const ctx = { tabId, frameId: frameIdForUrl(tabId, mpdUrl), authHeaders };
     const body = await fetchTextWithStrategy(mpdUrl, 'manifest', ctx);
 
     if (!isDashManifest(body)) return { video: [], audio: [] };
@@ -284,12 +402,14 @@ async function resolveIframe(iframeUrl, tabId) {
     const iframeOrigin = new URL(iframeUrl).origin;
     const matchingManifests = [];
     for (const [url] of tabManifests) {
-      if (url.startsWith(iframeOrigin) || MANIFEST_URL_RE.test(url)) {
-        matchingManifests.push(url);
-      }
+      if (SUB_RESOURCE_NAMES.test(url)) continue;
+      // Same-origin manifests first; CDN manifests (e.g. akamaized.net) after
+      if (url.startsWith(iframeOrigin)) matchingManifests.unshift(url);
+      else matchingManifests.push(url);
     }
     if (matchingManifests.length > 0) {
-      return { manifests: matchingManifests, authHeaders };
+      const streamType = tabManifests.get(matchingManifests[0]).streamType;
+      return { manifests: matchingManifests, streamType, authHeaders };
     }
   }
 
@@ -310,9 +430,10 @@ async function resolveIframe(iframeUrl, tabId) {
 async function downloadHlsStream(opts) {
   const { variantUrl, authHeaders = {}, filename, tabId, jobId } = opts;
 
-  const fetchers = createFetcherSet(tabId, authHeaders);
+  const frameId = frameIdForUrl(tabId, variantUrl);
+  const fetchers = createFetcherSet(tabId, authHeaders, frameId);
 
-  const body = await fetchTextWithStrategy(variantUrl, 'manifest', { tabId, authHeaders });
+  const body = await fetchTextWithStrategy(variantUrl, 'manifest', { tabId, frameId, authHeaders });
   const playlist = parseMediaPlaylistDetailed(body, variantUrl);
 
   const ext = 'ts';
@@ -339,14 +460,11 @@ async function downloadHlsStream(opts) {
         }).catch(() => {});
       },
       onComplete: async (blob) => {
-        const url = URL.createObjectURL(blob);
         try {
-          const downloadId = await startSimpleDownload(url, finalFilename, tabId);
+          const downloadId = await saveBlob(blob, finalFilename, tabId);
           resolve({ downloadId, jobId });
         } catch (err) {
           reject(err);
-        } finally {
-          setTimeout(() => URL.revokeObjectURL(url), 60000);
         }
       },
       onError: reject,
@@ -355,24 +473,46 @@ async function downloadHlsStream(opts) {
 }
 
 /**
- * Download a DASH stream: resolve MPD → fetch segments → assemble.
+ * Download a DASH stream: resolve MPD → fetch video + audio segments →
+ * mux into a single MP4.
  */
 async function downloadDashStream(opts) {
   const { representationId, mpdUrl, authHeaders = {}, filename, tabId, jobId } = opts;
 
-  const fetchers = createFetcherSet(tabId, authHeaders);
+  const frameId = frameIdForUrl(tabId, mpdUrl);
+  const fetchers = createFetcherSet(tabId, authHeaders, frameId);
 
-  const body = await fetchTextWithStrategy(mpdUrl, 'manifest', { tabId, authHeaders });
+  const body = await fetchTextWithStrategy(mpdUrl, 'manifest', { tabId, frameId, authHeaders });
   const mpd = parseMpd(body, mpdUrl);
 
-  const allReps = [...mpd.video, ...mpd.audio];
-  const rep = allReps.find(r => r.id === representationId) || mpd.video[0];
-  if (!rep) throw new Error('No representation found');
-
-  let initSegment = null;
-  if (rep.initUrl) {
-    initSegment = await fetchWithStrategy(rep.initUrl, 'segment', { tabId, authHeaders });
+  // Selected video rep (or best), plus the best audio rep when audio is separate.
+  // If an audio rep was explicitly selected, download just that.
+  const pickedAudio = mpd.audio.find(r => r.id === representationId);
+  const videoRep = pickedAudio
+    ? null
+    : (mpd.video.find(r => r.id === representationId) || mpd.video[0]);
+  const audioRep = pickedAudio || mpd.audio[0] || null;
+  const tracks = [videoRep, audioRep].filter(Boolean);
+  if (tracks.length === 0) throw new Error('No representation found');
+  if (tracks.some(r => r.hasDrm)) {
+    throw new Error('This stream is DRM-protected and cannot be downloaded');
   }
+
+  // One segment list for the whole job: [init?, ...media] per track.
+  const segments = [];
+  const layout = tracks.map((rep) => {
+    const entry = { initIndex: -1, start: 0, end: 0 };
+    if (rep.initUrl) {
+      entry.initIndex = segments.length;
+      segments.push({ url: rep.initUrl, sequence: segments.length, key: null });
+    }
+    entry.start = segments.length;
+    for (const url of rep.segmentUrls) {
+      segments.push({ url, sequence: segments.length, key: null });
+    }
+    entry.end = segments.length;
+    return entry;
+  });
 
   const ext = 'mp4';
   const finalFilename = filename || `video_${Date.now()}.${ext}`;
@@ -380,15 +520,26 @@ async function downloadDashStream(opts) {
   return new Promise((resolve, reject) => {
     startSegmentDownload({
       jobId,
-      segments: rep.segmentUrls.map((url, i) => ({
-        url,
-        sequence: i,
-        key: null,
-      })),
-      initSegment,
+      segments,
+      initSegment: null,
       outputExt: ext,
       keyFetcher: fetchers.keyFetcher,
       segmentFetcher: fetchers.segmentFetcher,
+      assemble: (buffers) => {
+        const trackData = layout.map(l => ({
+          init: l.initIndex >= 0 ? buffers[l.initIndex] : null,
+          segments: buffers.slice(l.start, l.end),
+        }));
+        if (trackData.length === 1) {
+          const [t] = trackData;
+          return [t.init, ...t.segments].filter(Boolean);
+        }
+        try {
+          return muxFragmentedMp4(trackData);
+        } catch (err) {
+          throw new Error(`Could not combine video and audio: ${err.message}`);
+        }
+      },
       onProgress: (job) => {
         chrome.runtime.sendMessage({
           action: 'streamProgress',
@@ -398,14 +549,11 @@ async function downloadDashStream(opts) {
         }).catch(() => {});
       },
       onComplete: async (blob) => {
-        const url = URL.createObjectURL(blob);
         try {
-          const downloadId = await startSimpleDownload(url, finalFilename, tabId);
+          const downloadId = await saveBlob(blob, finalFilename, tabId);
           resolve({ downloadId, jobId });
         } catch (err) {
           reject(err);
-        } finally {
-          setTimeout(() => URL.revokeObjectURL(url), 60000);
         }
       },
       onError: reject,

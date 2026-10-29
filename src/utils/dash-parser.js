@@ -7,6 +7,8 @@
  * Inventing Fire with AI — by Rich Crane
  */
 
+import { parseXml, child, children, descendants } from './xml-lite.js';
+
 /**
  * @typedef {Object} DashRepresentation
  * @property {string}      id          — representation ID
@@ -30,14 +32,14 @@
  * @returns {{ video: DashRepresentation[], audio: DashRepresentation[], hasDrm: boolean }}
  */
 export function parseMpd(xml, baseUrl) {
-  const parser = new DOMParser();
-  const doc = parser.parseFromString(xml, 'application/xml');
-
-  if (doc.querySelector('parsererror')) {
-    throw new Error('Failed to parse MPD XML');
+  // DOMParser is unavailable in MV3 service workers — use the lite parser.
+  let mpd;
+  try {
+    mpd = parseXml(xml);
+  } catch (err) {
+    throw new Error(`Failed to parse MPD XML: ${err.message}`);
   }
-
-  const mpd = doc.documentElement;
+  if (mpd.name !== 'MPD') throw new Error('Failed to parse MPD XML');
 
   // Resolve BaseURL if present
   const mpdBase = resolveBaseUrl(mpd, baseUrl);
@@ -46,37 +48,37 @@ export function parseMpd(xml, baseUrl) {
   const audio = [];
   let hasDrm = false;
 
-  const periods = mpd.querySelectorAll('Period');
+  const periods = children(mpd, 'Period');
   for (const period of periods) {
     const periodBase = resolveBaseUrl(period, mpdBase);
 
-    const adaptationSets = period.querySelectorAll('AdaptationSet');
+    const adaptationSets = children(period, 'AdaptationSet');
     for (const as of adaptationSets) {
       const asBase = resolveBaseUrl(as, periodBase);
-      const asMime = as.getAttribute('mimeType') || '';
-      const asCodecs = as.getAttribute('codecs') || '';
-      const contentType = as.getAttribute('contentType') || asMime.split('/')[0] || '';
+      const asMime = as.attrs.mimeType || '';
+      const asCodecs = as.attrs.codecs || '';
+      const contentType = as.attrs.contentType || asMime.split('/')[0] || '';
 
       // DRM detection
-      const cpElements = as.querySelectorAll('ContentProtection');
+      const cpElements = descendants(as, 'ContentProtection');
       if (cpElements.length > 0) hasDrm = true;
 
-      const representations = as.querySelectorAll('Representation');
+      const representations = children(as, 'Representation');
       for (const rep of representations) {
         const repBase = resolveBaseUrl(rep, asBase);
-        const mimeType = rep.getAttribute('mimeType') || asMime;
-        const codecs = rep.getAttribute('codecs') || asCodecs;
-        const bandwidth = parseInt(rep.getAttribute('bandwidth'), 10) || 0;
-        const width = parseInt(rep.getAttribute('width'), 10) || null;
-        const height = parseInt(rep.getAttribute('height'), 10) || null;
-        const id = rep.getAttribute('id') || '';
+        const mimeType = rep.attrs.mimeType || asMime;
+        const codecs = rep.attrs.codecs || asCodecs;
+        const bandwidth = parseInt(rep.attrs.bandwidth, 10) || 0;
+        const width = parseInt(rep.attrs.width ?? as.attrs.width, 10) || null;
+        const height = parseInt(rep.attrs.height ?? as.attrs.height, 10) || null;
+        const id = rep.attrs.id || '';
 
         // Check rep-level DRM too
-        const repCp = rep.querySelectorAll('ContentProtection');
+        const repCp = descendants(rep, 'ContentProtection');
         if (repCp.length > 0) hasDrm = true;
 
         // Resolve segments
-        const { initUrl, segmentUrls } = resolveSegments(rep, as, period, repBase);
+        const { initUrl, segmentUrls } = resolveSegments(rep, as, period, mpd, repBase);
 
         const label = buildLabel(width, height, bandwidth, codecs);
 
@@ -123,45 +125,54 @@ export function isDashManifest(text) {
 // ── Internal helpers ────────────────────────────────────────────────
 
 function resolveBaseUrl(element, fallback) {
-  const baseEl = element.querySelector(':scope > BaseURL');
-  if (baseEl?.textContent) {
+  const baseEl = child(element, 'BaseURL');
+  if (baseEl?.text) {
     try {
-      return new URL(baseEl.textContent.trim(), fallback).href;
+      return new URL(baseEl.text.trim(), fallback).href;
     } catch { /* ignore */ }
   }
   return fallback;
 }
 
-function resolveSegments(rep, adaptationSet, period, baseUrl) {
+function resolveSegments(rep, adaptationSet, period, mpd, baseUrl) {
   let initUrl = null;
   const segmentUrls = [];
 
   // SegmentList approach
-  const segList = rep.querySelector('SegmentList') || adaptationSet.querySelector('SegmentList');
+  const segList = child(rep, 'SegmentList') || child(adaptationSet, 'SegmentList');
   if (segList) {
-    const initEl = segList.querySelector('Initialization');
-    if (initEl) {
-      const src = initEl.getAttribute('sourceURL') || initEl.getAttribute('range');
-      if (src) initUrl = resolveUrl(src, baseUrl);
+    const initEl = child(segList, 'Initialization');
+    if (initEl?.attrs.sourceURL) {
+      initUrl = resolveUrl(initEl.attrs.sourceURL, baseUrl);
     }
-    for (const seg of segList.querySelectorAll('SegmentURL')) {
-      const media = seg.getAttribute('media');
+    for (const seg of children(segList, 'SegmentURL')) {
+      const media = seg.attrs.media;
       if (media) segmentUrls.push(resolveUrl(media, baseUrl));
     }
+    // Byte-range lists (mediaRange only) point into one file at baseUrl,
+    // which already holds the init and every fragment — fetch it whole.
+    if (segmentUrls.length === 0) segmentUrls.push(baseUrl);
     return { initUrl, segmentUrls };
   }
 
-  // SegmentTemplate approach
-  const segTmpl = rep.querySelector('SegmentTemplate')
-    || adaptationSet.querySelector('SegmentTemplate')
-    || period.querySelector('SegmentTemplate');
+  // SegmentTemplate approach — attributes inherit Period → AdaptationSet → Representation
+  const tmplChain = [
+    child(period, 'SegmentTemplate'),
+    child(adaptationSet, 'SegmentTemplate'),
+    child(rep, 'SegmentTemplate'),
+  ].filter(Boolean);
 
-  if (segTmpl) {
-    const initTmpl = segTmpl.getAttribute('initialization');
-    const mediaTmpl = segTmpl.getAttribute('media');
-    const repId = rep.getAttribute('id') || '0';
-    const bandwidth = rep.getAttribute('bandwidth') || '0';
-    const startNumber = parseInt(segTmpl.getAttribute('startNumber') || '1', 10);
+  if (tmplChain.length > 0) {
+    const tmplAttrs = Object.assign({}, ...tmplChain.map(t => t.attrs));
+    const initTmpl = tmplAttrs.initialization;
+    const mediaTmpl = tmplAttrs.media;
+    const repId = rep.attrs.id || '0';
+    const bandwidth = rep.attrs.bandwidth || '0';
+    const startNumber = parseInt(tmplAttrs.startNumber || '1', 10);
+    const timescale = parseInt(tmplAttrs.timescale || '1', 10);
+    const totalDuration = parseDuration(
+      period.attrs.duration || mpd.attrs.mediaPresentationDuration || ''
+    );
 
     if (initTmpl) {
       initUrl = resolveUrl(
@@ -170,16 +181,27 @@ function resolveSegments(rep, adaptationSet, period, baseUrl) {
       );
     }
 
-    // SegmentTimeline
-    const timeline = segTmpl.querySelector('SegmentTimeline');
+    // SegmentTimeline (most specific template that has one wins)
+    const timeline = tmplChain
+      .map(t => child(t, 'SegmentTimeline'))
+      .filter(Boolean)
+      .pop();
     if (timeline) {
       let time = 0;
       let number = startNumber;
-      for (const s of timeline.querySelectorAll('S')) {
-        const t = parseInt(s.getAttribute('t'), 10);
+      const entries = children(timeline, 'S');
+      entries.forEach((s, idx) => {
+        const t = parseInt(s.attrs.t, 10);
         if (!isNaN(t)) time = t;
-        const d = parseInt(s.getAttribute('d'), 10) || 0;
-        const r = parseInt(s.getAttribute('r'), 10) || 0;
+        const d = parseInt(s.attrs.d, 10) || 0;
+        let r = parseInt(s.attrs.r, 10) || 0;
+
+        // r < 0: repeat until the next S@t or the end of the period
+        if (r < 0 && d > 0) {
+          const nextT = parseInt(entries[idx + 1]?.attrs.t, 10);
+          const end = !isNaN(nextT) ? nextT : totalDuration * timescale;
+          r = Math.max(0, Math.ceil((end - time) / d) - 1);
+        }
 
         for (let i = 0; i <= r; i++) {
           if (mediaTmpl) {
@@ -191,15 +213,10 @@ function resolveSegments(rep, adaptationSet, period, baseUrl) {
           time += d;
           number++;
         }
-      }
+      });
     } else {
       // Compute from duration + total duration
-      const timescale = parseInt(segTmpl.getAttribute('timescale') || '1', 10);
-      const duration = parseInt(segTmpl.getAttribute('duration') || '0', 10);
-      const totalDuration = parseDuration(
-        period.getAttribute('duration') ||
-        rep.closest('MPD')?.getAttribute('mediaPresentationDuration') || ''
-      );
+      const duration = parseInt(tmplAttrs.duration || '0', 10);
 
       if (duration > 0 && totalDuration > 0) {
         const segmentDurationSec = duration / timescale;
@@ -220,16 +237,8 @@ function resolveSegments(rep, adaptationSet, period, baseUrl) {
     return { initUrl, segmentUrls };
   }
 
-  // SegmentBase / BaseURL-only (single file)
-  const segBase = rep.querySelector('SegmentBase');
-  if (segBase) {
-    const initRange = segBase.querySelector('Initialization')?.getAttribute('range');
-    // For BaseURL-only, the entire file is at baseUrl
-    segmentUrls.push(baseUrl);
-    return { initUrl: initRange ? `${baseUrl}#range=${initRange}` : null, segmentUrls };
-  }
-
-  // Fallback: treat baseUrl as the media URL
+  // SegmentBase / BaseURL-only (single file). The file already contains
+  // its own init (ftyp/moov), so no separate init segment is fetched.
   segmentUrls.push(baseUrl);
   return { initUrl, segmentUrls };
 }
@@ -238,10 +247,23 @@ function fillTemplate(template, repId, bandwidth, number, time) {
   return template
     .replace(/\$RepresentationID\$/g, repId)
     .replace(/\$Bandwidth\$/g, bandwidth)
-    .replace(/\$Number(?:%(\d+)d)?\$/g, (_m, pad) => {
+    .replace(/\$Number(?:%0?(\d+)d)?\$/g, (_m, pad) => {
       return pad ? String(number).padStart(parseInt(pad, 10), '0') : String(number);
     })
-    .replace(/\$Time\$/g, String(time ?? 0));
+    .replace(/\$Time(?:%0?(\d+)d)?\$/g, (_m, pad) => {
+      const t = String(time ?? 0);
+      return pad ? t.padStart(parseInt(pad, 10), '0') : t;
+    })
+    .replace(/\$\$/g, '$');
+}
+
+function buildLabel(width, height, bandwidth, codecs) {
+  const parts = [];
+  if (height) parts.push(`${height}p`);
+  if (width && height) parts.push(`(${width}x${height})`);
+  if (bandwidth) parts.push(`- ${(bandwidth / 1000000).toFixed(1)} Mbps`);
+  if (!parts.length && codecs) parts.push(codecs);
+  return parts.join(' ') || 'Default';
 }
 
 function resolveUrl(relative, base) {

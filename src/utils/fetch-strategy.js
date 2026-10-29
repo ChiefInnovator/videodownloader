@@ -48,8 +48,12 @@ const STRATEGIES = [
       // Use chrome.scripting.executeScript with world: 'MAIN' to run
       // fetch() in the page's actual JS context. This bypasses the page's
       // CSP (unlike <script> injection) and inherits the page's CORS + cookies.
+      // Target the frame that requested the resource (e.g. a cross-origin
+      // ON24 iframe) so the fetch runs with that frame's cookies and CORS.
+      const target = { tabId: ctx.tabId };
+      if (ctx.frameId) target.frameIds = [ctx.frameId];
       const results = await chrome.scripting.executeScript({
-        target: { tabId: ctx.tabId },
+        target,
         world: 'MAIN',
         func: async (fetchUrl) => {
           try {
@@ -79,10 +83,11 @@ const STRATEGIES = [
     name: 'content-script',
     available: (ctx) => ctx.tabId != null,
     execute: async (url, ctx) => {
+      // all_frames content scripts let us fetch from inside the iframe
       const response = await chrome.tabs.sendMessage(ctx.tabId, {
         action: 'fetchResourceContentScript',
         url,
-      });
+      }, ctx.frameId != null ? { frameId: ctx.frameId } : undefined);
       if (response?.error) throw new Error(response.error);
       if (!response?.data) throw new Error('Empty response');
       return new Uint8Array(response.data).buffer;
@@ -149,7 +154,7 @@ export function clearCache(domain) {
  *
  * @param {string} url
  * @param {'manifest'|'key'|'segment'} operationType
- * @param {{ tabId: number|null, authHeaders?: HeadersInit, signal?: AbortSignal }} context
+ * @param {{ tabId: number|null, frameId?: number|null, authHeaders?: HeadersInit, signal?: AbortSignal }} context
  * @returns {Promise<ArrayBuffer>}
  */
 export async function fetchWithStrategy(url, operationType, context) {
@@ -210,10 +215,11 @@ export async function fetchTextWithStrategy(url, operationType, context) {
  *
  * @param {number|null} tabId
  * @param {HeadersInit} [authHeaders={}]
+ * @param {number|null} [frameId=null] — frame to fetch from (cross-origin iframes)
  * @returns {{ manifestFetcher, keyFetcher, segmentFetcher }}
  */
-export function createFetcherSet(tabId, authHeaders = {}) {
-  const ctx = { tabId, authHeaders };
+export function createFetcherSet(tabId, authHeaders = {}, frameId = null) {
+  const ctx = { tabId, frameId, authHeaders };
 
   return {
     manifestFetcher: (url) => fetchWithStrategy(url, 'manifest', ctx),

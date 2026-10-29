@@ -138,8 +138,8 @@ function renderVideoItem(video, idx, tabId) {
   const quality = qualityLabel(video.width, video.height);
   const size = video.size ? formatBytes(video.size) : '';
   const title = video.title || (isPending ? 'Video (not yet playing)' : filenameFromUrl(video.url, ext));
-  const isHls = ext === 'm3u8';
-  const isDash = ext === 'mpd';
+  const isHls = video.streamType === 'hls' || (!video.streamType && ext === 'm3u8');
+  const isDash = video.streamType === 'dash' || (!video.streamType && ext === 'mpd');
   const isStream = isHls || isDash;
   const itemId = `vid-${idx}`;
 
@@ -300,8 +300,10 @@ async function onResolveIframe(iframe, itemId, tabId, li) {
 
     // Success — replace resolve button with quality selector + download
     const manifestUrl = result.manifests[0];
-    const isHls = /\.m3u8/i.test(manifestUrl);
-    const isDash = /\.mpd/i.test(manifestUrl);
+    const isDash = result.streamType
+      ? result.streamType === 'dash'
+      : /\.mpd/i.test(manifestUrl);
+    const isHls = !isDash;
 
     actionsEl.innerHTML = `
       <select class="quality-select" id="quality-${itemId}"><option>Loading&hellip;</option></select>

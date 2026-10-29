@@ -45,6 +45,7 @@ const segmentBuffers = new Map();
  * @param {string}        opts.outputExt       — 'ts', 'mp4', etc.
  * @param {Function}      opts.keyFetcher      — async (keyUri) => ArrayBuffer
  * @param {Function}      opts.segmentFetcher  — async (url) => ArrayBuffer
+ * @param {Function}      [opts.assemble]      — (buffers) => BlobPart[]; overrides plain concatenation
  * @param {Function}      opts.onProgress      — called with job state on every segment
  * @param {Function}      opts.onComplete      — called with final Blob
  * @param {Function}      opts.onError         — called with Error
@@ -58,6 +59,7 @@ export function startSegmentDownload(opts) {
     outputExt = 'ts',
     keyFetcher,
     segmentFetcher,
+    assemble = null,
     onProgress = () => {},
     onComplete = () => {},
     onError = () => {},
@@ -87,7 +89,7 @@ export function startSegmentDownload(opts) {
 
   const keyCache = new Map();
 
-  runPipeline(jobId, segments, buffers, initSegment, outputExt,
+  runPipeline(jobId, segments, buffers, initSegment, outputExt, assemble,
     keyFetcher, segmentFetcher, keyCache, controller, job, onComplete, onError);
 
   return jobId;
@@ -143,7 +145,7 @@ export function listJobs() {
 // ── Download pipeline ───────────────────────────────────────────────
 
 async function runPipeline(
-  jobId, segments, buffers, initSegment, outputExt,
+  jobId, segments, buffers, initSegment, outputExt, assemble,
   keyFetcher, segmentFetcher, keyCache, controller, job, onComplete, onError,
 ) {
   try {
@@ -152,10 +154,14 @@ async function runPipeline(
     if (job.state === 'paused') return;
 
     // Assemble final blob
-    const parts = [];
-    if (initSegment) parts.push(initSegment);
-    for (const buf of buffers) {
-      if (buf) parts.push(buf);
+    let parts = [];
+    if (assemble) {
+      parts = assemble(buffers);
+    } else {
+      if (initSegment) parts.push(initSegment);
+      for (const buf of buffers) {
+        if (buf) parts.push(buf);
+      }
     }
 
     const mimeType = outputExt === 'mp4' ? 'video/mp4' : 'video/mp2t';
