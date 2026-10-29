@@ -6,8 +6,8 @@
 <meta name="color-scheme" content="dark">
 
 <!-- Primary SEO -->
-<title>Video Downloader v2.3 — Capture HLS, DASH & AES‑128 Streams From Any Page | Chrome Extension by Rich Crane</title>
-<meta name="description" content="Free Chrome extension that detects and downloads HTML5 video, HLS (.m3u8), DASH (.mpd), AES‑128 encrypted streams, and cross‑origin iframe embeds from Medius, ON24, Vimeo, Mux, Wistia, and Brightcove. Segment‑level progress, pause/resume, JWT + cookie auth forwarding, DRM‑aware. Built by Microsoft MVP Rich Crane — Inventing Fire with AI.">
+<title>Video Downloader — Save Videos From Web Pages, Free & Private | Chrome Extension by Rich Crane</title>
+<meta name="description" content="Free Chrome extension that saves the videos you watch on the web — webinars, training sessions, lectures, and embedded players like Vimeo, Wistia, and Panopto — as one file you can keep and watch offline. No account, no tracking. Built by Microsoft MVP Rich Crane.">
 <meta name="keywords" content="video downloader, chrome extension video downloader, HLS downloader, m3u8 downloader, DASH downloader, mpd downloader, AES-128 HLS decryption, iframe video download, Medius video downloader, ON24 video downloader, DASH to MP4, mpd to mp4, Vimeo embed downloader, Mux stream downloader, Wistia downloader, Brightcove downloader, HLS to MP4, video stream capture, offline video archive, manifest v3 extension, Widevine detection, PlayReady detection, FairPlay detection, Rich Crane, Richard Crane, MILL5, Inventing Fire with AI, Microsoft MVP">
 <meta name="author" content="Richard Crane">
 <meta name="robots" content="index, follow, max-snippet:-1, max-image-preview:large, max-video-preview:-1">
@@ -33,8 +33,8 @@
 <!-- Open Graph -->
 <meta property="og:type" content="website">
 <meta property="og:site_name" content="Video Downloader">
-<meta property="og:title" content="Video Downloader v2.3 — Capture HLS, DASH & AES‑128 Streams From Any Page">
-<meta property="og:description" content="Detect and download HTML5 video, HLS, DASH, AES‑128 encrypted streams, and cross‑origin iframe embeds. Free Chrome extension by Microsoft MVP Rich Crane.">
+<meta property="og:title" content="Video Downloader — Save Videos From Web Pages, Free & Private">
+<meta property="og:description" content="Save webinars, training sessions, lectures, and embedded videos as one offline file. Free Chrome extension — no account, no tracking. By Rich Crane.">
 <meta property="og:url" content="https://chiefinnovator.github.io/videodownloader/">
 <meta property="og:image" content="https://chiefinnovator.github.io/videodownloader/images/og-card.png">
 <meta property="og:image:secure_url" content="https://chiefinnovator.github.io/videodownloader/images/og-card.png">
@@ -48,8 +48,8 @@
 <meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:site" content="@chiefinnovator">
 <meta name="twitter:creator" content="@chiefinnovator">
-<meta name="twitter:title" content="Video Downloader v2.3 — Capture HLS, DASH & AES‑128 Streams From Any Page">
-<meta name="twitter:description" content="Free Chrome extension that detects and downloads HTML5 video, HLS (.m3u8), DASH (.mpd), AES‑128 encrypted streams, and cross‑origin iframe embeds. By Rich Crane.">
+<meta name="twitter:title" content="Video Downloader — Save Videos From Web Pages, Free & Private">
+<meta name="twitter:description" content="Save webinars, training sessions, lectures, and embedded videos as one offline file. Free Chrome extension — no account, no tracking. By Rich Crane.">
 <meta name="twitter:image" content="https://chiefinnovator.github.io/videodownloader/images/og-card.png">
 <meta name="twitter:image:alt" content="Video Downloader — Chrome extension capturing HLS and DASH streams.">
 
@@ -61,7 +61,7 @@
   "name": "Video Downloader",
   "alternateName": "Inventing Fire Video Downloader",
   "description": "A Chrome (Manifest V3) extension that detects HTML5 video, HLS (.m3u8), DASH (.mpd), AES‑128 encrypted streams, fMP4/CMAF HLS, and cross‑origin iframe embeds — resolving Vimeo, Wistia, JW Player, Mux, Cloudflare Stream, Vidyard, and Panopto embeds through each platform's own player API — then downloads them for offline viewing. Includes segment‑level progress, automatic retries that skip a briefly unavailable segment, pause/resume/cancel, JWT and cookie authentication forwarding, and DRM detection for Widevine, PlayReady, and FairPlay.",
-  "softwareVersion": "2.3.0",
+  "softwareVersion": "2.4.0",
   "applicationCategory": "BrowserApplication",
   "applicationSubCategory": "Chrome Extension",
   "operatingSystem": "Chrome 114+, Edge 114+, Brave, Arc, Vivaldi (any Chromium browser supporting Manifest V3)",
@@ -88,7 +88,7 @@
   "url": "https://chiefinnovator.github.io/videodownloader/",
   "downloadUrl": "https://github.com/ChiefInnovator/videodownloader/releases/latest",
   "installUrl": "https://chiefinnovator.github.io/videodownloader/#install",
-  "releaseNotes": "https://github.com/ChiefInnovator/videodownloader/releases/tag/v2.3.0",
+  "releaseNotes": "https://github.com/ChiefInnovator/videodownloader/releases/tag/v2.4.0",
   "fileSize": "68 KB",
   "isAccessibleForFree": true,
   "datePublished": "2026-03-26",
@@ -103,6 +103,8 @@
     "Resilient downloads: retries with backoff, skips a briefly unavailable segment, strips Anvato/Uplynk ad segments",
     "Player‑config detection: JW Player, Video.js, Flowplayer, Next.js and Nuxt page data, <mux-player>, JSON‑LD embedUrl, twitter:player:stream",
     "Session‑titled filenames and linked slide‑deck downloads",
+    "Audio‑only download (.m4a) from DASH streams, no re‑encoding",
+    "Copy a video's direct link to the clipboard",
     "DASH (.mpd) parsing with video and audio muxed into a single MP4 (no re‑encoding)",
     "AES‑128 CBC segment decryption via Web Crypto API",
     "Cross‑origin iframe embed resolution (Medius, ON24, Vimeo, Mux, Wistia, Brightcove, JW Player, Cloudflare Stream, Vidyard, Panopto)",
@@ -127,7 +129,7 @@
   "familyName": "Crane",
   "alternateName": "Rich Crane",
   "jobTitle": "Microsoft MVP, Founder & Chief AI Officer at MILL5",
-  "description": "Microsoft Most Valuable Professional and founder of MILL5, a software consultancy specializing in cloud, AI, and developer tooling. Host of the Inventing Fire with AI podcast.",
+  "description": "Microsoft Most Valuable Professional and Founder of MILL5, a software consultancy specializing in cloud, AI, and developer tooling. Host of the Inventing Fire with AI podcast.",
   "url": "https://mill5.com",
   "sameAs": [
     "https://mill5.com",
@@ -166,90 +168,114 @@
   "mainEntity": [
     {
       "@type": "Question",
-      "name": "What does the Video Downloader Chrome extension do?",
+      "name": "What does Video Downloader do?",
       "acceptedAnswer": {
         "@type": "Answer",
-        "text": "Video Downloader detects video content on any web page — HTML5 <video> elements, HLS (.m3u8) playlists, DASH (.mpd) manifests, AES‑128 encrypted streams, and cross‑origin iframe embeds from platforms like Medius, ON24, Vimeo, Mux, Wistia, and Brightcove — then downloads it for offline viewing. It parses manifests, fetches encryption keys, decrypts segments in the browser via the Web Crypto API, and assembles the final file with segment‑level progress, pause, resume, and cancel."
+        "text": "It saves videos from web pages as a single file on your computer, so you can keep them and watch offline — webinars, training sessions, lectures, conference talks, and videos playing inside embedded players. Click the toolbar icon, pick a video, and press Download."
       }
     },
     {
       "@type": "Question",
-      "name": "Can Video Downloader download AES‑128 encrypted HLS streams?",
+      "name": "Is it really free? Does it track me?",
       "acceptedAnswer": {
         "@type": "Answer",
-        "text": "Yes. When a master or media playlist declares AES‑128 encryption, the extension fetches the key URI, reads the IV, downloads each segment, and decrypts using AES‑CBC through the browser's native Web Crypto API. Decrypted segments are concatenated into a single .ts file you can play directly in VLC or mpv, or convert to MP4 with ffmpeg."
+        "text": "It's free, with no account, no ads, no analytics, and no tracking. Nothing about what you watch is sent anywhere — the extension only talks to the site you're downloading from, and everything else happens inside your browser. There is no server owned by the developer."
       }
     },
     {
       "@type": "Question",
-      "name": "Does Video Downloader work with cross‑origin iframe embeds?",
+      "name": "Which sites does it work with?",
       "acceptedAnswer": {
         "@type": "Answer",
-        "text": "Yes. The extension scans every <iframe> on the page, classifies each one by domain and path (Medius, ON24, Vimeo, Mux, Wistia, Brightcove, JW Player, Cloudflare Stream, Vidyard, Panopto, and generic /embed/, /video/, /player/ paths), and resolves streams by asking the platform's own player API for Vimeo, Wistia, JW Player, Mux, Cloudflare Stream, Vidyard, and Panopto, then falling back to network‑level manifest capture and embed‑page parsing. JWT tokens from the iframe URL and session cookies from the origin are forwarded on manifest, segment, and key requests so authenticated streams just work."
+        "text": "Most sites that play video right in the page, plus the embedded players common at work and school: Vimeo, Wistia, Panopto, Vidyard, JW Player, Mux, Brightcove, ON24, Cloudflare Stream, Microsoft Medius, and others. If you're signed in and can watch it, it can usually save it. YouTube isn't supported."
       }
     },
     {
       "@type": "Question",
-      "name": "Can Video Downloader bypass Widevine, PlayReady, or FairPlay DRM?",
+      "name": "Can it download Netflix, Disney+, or other copy‑protected video?",
       "acceptedAnswer": {
         "@type": "Answer",
-        "text": "No. Video Downloader detects DRM‑protected content and clearly warns the user that it cannot be downloaded. The extension respects content protection — it does not attempt to circumvent Widevine, PlayReady, FairPlay, or any other DRM system. It is intended for legitimate offline viewing of content the user is authorized to access: training materials, webinars, user‑generated content, research sources, and personal archives."
+        "text": "No. Those services use copy protection (DRM such as Widevine, PlayReady, and FairPlay). Video Downloader recognizes it and tells you the video can't be saved — it never tries to get around it. It's meant for video you're allowed to access and have a reason to keep."
       }
     },
     {
       "@type": "Question",
-      "name": "Does Video Downloader support DASH (.mpd) streams?",
+      "name": "Which browsers does it work in?",
       "acceptedAnswer": {
         "@type": "Answer",
-        "text": "Yes. The extension parses DASH Media Presentation Description (.mpd) manifests — reading adaptation sets, representations, segment templates, and timelines — to enumerate available qualities. It downloads the chosen video representation plus the best audio track and muxes them into a single MP4 in the browser — no re‑encoding and no ffmpeg required."
+        "text": "Google Chrome and Microsoft Edge (version 114 or newer), plus Brave, Arc, Vivaldi, Opera, and other Chromium‑based browsers. Firefox and Safari aren't supported yet."
       }
     },
     {
       "@type": "Question",
-      "name": "What browsers does Video Downloader support?",
+      "name": "How do I install it?",
       "acceptedAnswer": {
         "@type": "Answer",
-        "text": "Any Chromium‑based browser with Manifest V3 support: Google Chrome 114+, Microsoft Edge 114+, Brave, Arc, Vivaldi, Opera, and similar. Firefox is not currently supported."
+        "text": "Download the latest videodownloader-vX.Y.Z.zip from GitHub Releases and unzip it. Open chrome://extensions, turn on Developer mode, click Load unpacked, and choose the unzipped folder. The Video Downloader icon appears in your toolbar. A Chrome Web Store listing is in review."
       }
     },
     {
       "@type": "Question",
-      "name": "Does the extension collect data, analytics, or telemetry?",
+      "name": "My video saved as a .ts file. How do I turn it into an MP4?",
       "acceptedAnswer": {
         "@type": "Answer",
-        "text": "No. Video Downloader has no analytics, no telemetry, and no third‑party network calls. All processing — manifest parsing, segment fetching, decryption, and assembly — happens locally in your browser. There is no account, no sign‑in, and nothing is sent to any server owned by the developer."
+        "text": "Some streams save as MPEG‑TS (.ts); most players, such as VLC, open them as‑is. Other streams, including DASH and fMP4/CMAF HLS, save straight to MP4. To convert a .ts file without losing quality, run ffmpeg -i input.ts -c copy output.mp4 — it repackages the file in seconds without re‑encoding."
       }
     },
     {
       "@type": "Question",
-      "name": "Who built Video Downloader?",
+      "name": "Technical: which streaming formats are supported?",
       "acceptedAnswer": {
         "@type": "Answer",
-        "text": "Video Downloader was built by Rich Crane, a Microsoft Most Valuable Professional (MVP), founder and Chief AI Officer of MILL5, and host of the Inventing Fire with AI podcast. It is part of the Inventing Fire with AI initiative exploring what can be built with AI‑assisted development."
+        "text": "HLS (.m3u8) master and media playlists, including fMP4/CMAF playlists with #EXT-X-MAP init segments (saved as MP4) and #EXT-X-BYTERANGE segments fetched with HTTP Range requests. DASH (.mpd) with SegmentTemplate, SegmentTimeline, SegmentList, and SegmentBase — the chosen video representation and the best audio track are muxed into a single fragmented MP4 in the browser, with no re‑encoding and no ffmpeg. Direct files (MP4, WebM, and others) download as‑is. For live HLS, the segments currently in the playlist window are captured."
       }
     },
     {
       "@type": "Question",
-      "name": "How do I install Video Downloader?",
+      "name": "Technical: can it download AES‑128 encrypted HLS streams?",
       "acceptedAnswer": {
         "@type": "Answer",
-        "text": "Download the latest videodownloader-vX.Y.Z.zip from GitHub Releases (https://github.com/ChiefInnovator/videodownloader/releases/latest) and unzip it. Open chrome://extensions, turn on Developer mode, click Load unpacked, and select the unzipped folder. The fire‑orange play icon appears in the toolbar."
+        "text": "Yes. When a playlist declares #EXT-X-KEY METHOD=AES-128, the extension fetches the key, takes the IV from the playlist or derives it from the media sequence number, and decrypts each segment with AES‑CBC through the browser's Web Crypto API (crypto.subtle) — no WASM, no server. SAMPLE‑AES, FairPlay skd:// keys, PlayReady/Widevine KEYFORMATs, and Adobe Access (#EXT-X-FAXS-CM) are treated as DRM and refused."
       }
     },
     {
       "@type": "Question",
-      "name": "Which video platforms can Video Downloader resolve directly?",
+      "name": "Technical: how does it handle cross‑origin iframe embeds and sign‑ins?",
       "acceptedAnswer": {
         "@type": "Answer",
-        "text": "For Vimeo, Wistia, JW Player, Mux, Cloudflare Stream, Vidyard, and Panopto embeds, the extension asks the platform's own public player API for the stream manifest, using your existing session — the same approach the open‑source yt‑dlp project uses. Any other player is still covered by network capture, embed‑page parsing, and player‑config detection (JW Player, Video.js, Flowplayer, Next.js and Nuxt page data). YouTube is not supported."
+        "text": "The content script runs in every frame and classifies each <iframe> by domain (Medius, ON24, Vimeo, Mux, Wistia, Brightcove, JW Player, Cloudflare Stream, Vidyard, Panopto, and more) and by path (/embed/, /video/, /player/). For Vimeo, Wistia, JW Player, Mux, Cloudflare Stream, Vidyard, and Panopto it asks the platform's own public player API for the manifest — the approach the open‑source yt‑dlp project uses — fetched from inside the embed's frame so the platform sees its own cookies and origin. Otherwise it falls back to manifests captured from network traffic, then to parsing the embed page's HTML. JWT tokens from the iframe URL and session cookies (chrome.cookies) are forwarded on manifest, segment, and key requests; tokens stay in memory only."
       }
     },
     {
       "@type": "Question",
-      "name": "How do I convert the downloaded .ts file to MP4?",
+      "name": "Technical: how does it find videos on a page?",
       "acceptedAnswer": {
         "@type": "Answer",
-        "text": "Classic HLS downloads save as MPEG‑TS (.ts); fMP4/CMAF HLS and DASH downloads are already MP4. To convert a .ts file, use ffmpeg. A fast, lossless remux: ffmpeg -i input.ts -c copy output.mp4. This repackages the MPEG‑TS container into MP4 without re‑encoding, so it finishes in seconds and preserves original quality."
+        "text": "In layers: network interception (chrome.webRequest) of video MIME types and .m3u8/.mpd manifests; <video>, <source>, <object>, and <embed> elements; og:video (including extension‑less URLs typed by og:video:type), twitter:player:stream, and JSON‑LD VideoObject contentUrl/embedUrl; data-* attributes; media URLs in inline player setup code (JW Player, Video.js, Flowplayer) and framework data (Next.js __NEXT_DATA__, Nuxt); and <mux-player> elements. A MutationObserver re‑scans single‑page apps and lazy‑loaded players."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "Technical: how does it cope with long or flaky downloads?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "Segments download six at a time through a fetch‑strategy chain (page context, content script, then service worker). Each segment retries up to five times with exponential backoff capped at 20 seconds. A segment that stays unavailable is skipped and reported instead of failing the whole file — never the first segment or an init segment, and at most 10% of a download. When a CDN signs only the playlist URL, its query‑string token is carried onto segment and key requests. Anvato and Uplynk ad segments are dropped. Downloads can be paused, resumed, and cancelled."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "Technical: how is it built?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "A Chrome Manifest V3 extension in plain JavaScript ES modules — no build step, no npm dependencies. A content script detects media in every frame; the service worker intercepts network traffic, resolves embeds, parses HLS and DASH manifests, and orchestrates downloads; a segment downloader fetches, decrypts, and assembles; a small JS muxer combines DASH video and audio into one MP4; chrome.downloads saves the result. See ARCHITECTURE.md for the full design."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "Who built this?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "Video Downloader was built by Rich Crane, a Microsoft Most Valuable Professional, Founder and Chief AI Officer of MILL5, and host of the Inventing Fire with AI podcast. It is part of the Inventing Fire with AI initiative exploring what can be built with AI‑assisted development."
       }
     }
   ]
@@ -805,13 +831,8 @@
   .author-block .avatar {
     width: 88px; height: 88px;
     border-radius: 50%;
-    background: linear-gradient(160deg, var(--ember) 0%, var(--ember-deep) 100%);
+    background: var(--ink);
     display: grid; place-items: center;
-    font-family: var(--serif);
-    font-style: italic;
-    font-weight: 300;
-    font-size: 40px;
-    color: var(--ink);
     box-shadow: 0 0 0 2px rgba(255, 106, 26, 0.3), 0 12px 30px rgba(255, 106, 26, 0.25);
   }
   .author-block h4 {
@@ -905,15 +926,15 @@
   <!-- HERO -->
   <section class="hero">
     <div class="container">
-      <span class="eyebrow">Free · No accounts · No telemetry · No tracking</span>
+      <span class="eyebrow">Free · No account · No tracking</span>
       <h1>A video downloader that <em>doesn't watch</em> you back.</h1>
       <p class="hero-sub">
-        A Chrome extension that sees past <code style="font-family:var(--mono);font-size:15px;color:var(--ember-2)">&lt;video&gt;</code> tags — into HLS playlists, DASH manifests, AES‑128 encrypted segments, and cross‑origin iframe embeds — and pulls a single offline file out the other side. Free. No sign‑in. No analytics. Nothing leaves your browser except the segments it takes to download what you asked for. Built for journalists, researchers, educators, and engineers who need what they're watching to stay watchable.
+        Save the videos you're watching — webinars, training sessions, lectures, conference talks, and videos tucked inside embedded players — as one file you can keep and watch offline. Click the icon, pick a video, press Download. Free, no sign‑in, and nothing about what you watch ever leaves your browser.
       </p>
       <div class="hero-cta">
         <a class="btn btn-primary" href="https://github.com/ChiefInnovator/videodownloader/releases/latest" rel="noopener">
           <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 3v12m0 0l-4-4m4 4l4-4M5 21h14"/><path d="M5 21h14" stroke="currentColor" stroke-width="2" stroke-linecap="round" fill="none"/></svg>
-          Download v2.3.0
+          Download v2.4.0
         </a>
         <a class="btn btn-secondary" href="https://github.com/ChiefInnovator/videodownloader" rel="noopener">
           <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 .5C5.65.5.5 5.65.5 12c0 5.08 3.29 9.39 7.86 10.91.58.1.79-.25.79-.56v-2c-3.2.7-3.88-1.37-3.88-1.37-.53-1.34-1.29-1.7-1.29-1.7-1.05-.72.08-.7.08-.7 1.16.08 1.77 1.19 1.77 1.19 1.04 1.77 2.72 1.26 3.38.96.1-.75.41-1.26.74-1.55-2.55-.29-5.23-1.28-5.23-5.68 0-1.26.45-2.28 1.18-3.09-.12-.29-.51-1.46.11-3.05 0 0 .97-.31 3.18 1.18.92-.26 1.91-.39 2.9-.39.98 0 1.98.13 2.9.39 2.2-1.49 3.17-1.18 3.17-1.18.63 1.59.24 2.76.12 3.05.74.81 1.18 1.83 1.18 3.09 0 4.41-2.69 5.38-5.25 5.67.42.36.79 1.07.79 2.16v3.2c0 .31.21.67.8.56C20.22 21.39 23.5 17.08 23.5 12 23.5 5.65 18.35.5 12 .5z"/></svg>
@@ -921,18 +942,18 @@
         </a>
       </div>
       <div class="hero-meta">
-        <span>HLS · DASH · AES‑128</span>
-        <span>Iframe embeds</span>
-        <span>No telemetry</span>
-        <span>Zero dependencies</span>
+        <span>Works on most video sites</span>
+        <span>Webinars &amp; training</span>
+        <span>Slides too</span>
+        <span>No tracking</span>
       </div>
 
       <!-- Signal strip -->
       <div class="signal-strip" aria-hidden="true">
-        <div class="signal-label">CAPTURING · <b>master.m3u8</b></div>
+        <div class="signal-label">SAVING · <b>Quarterly All‑Hands.mp4</b></div>
         <div class="waveform" id="wave"></div>
         <div class="signal-readout">
-          <b>SEG 42/128</b> &nbsp; 33.0% &nbsp; 2.4 MB/s &nbsp; <b>AES‑128 · OK</b>
+          <b>42% done</b> &nbsp; 2.4 MB/s &nbsp; <b>about 1 min left</b>
         </div>
       </div>
     </div>
@@ -942,108 +963,87 @@
   <section class="section" id="features">
     <div class="container">
       <div class="section-head">
-        <div class="section-kicker">0.01 — What it captures</div>
-        <h2 class="section-title">Built for the <em>hard</em> cases<br>other downloaders quietly skip.</h2>
-        <p class="section-lede">Plain <code style="font-family:var(--mono);color:var(--ember-2)">.mp4</code> files are easy. The extension goes after what everybody else leaves on the page: adaptive streams, encrypted segments, cross‑origin players, and authenticated embeds.</p>
+        <div class="section-kicker">0.01 — What it does</div>
+        <h2 class="section-title">Save the video,<br>not just the <em>link</em>.</h2>
+        <p class="section-lede">Most pages don't offer a download button. Video Downloader finds the video anyway — even when it streams in pieces or plays inside another site's player — and hands you one file.</p>
       </div>
 
       <div class="features">
         <div class="feature wide">
-          <div class="feature-ord">01 · Adaptive streams</div>
-          <h3>HLS &amp; DASH, parsed in the browser</h3>
-          <p>Master playlists and media playlists. <code>.m3u8</code> and <code>.mpd</code>. Adaptation sets, representations, segment templates, and timelines. Pick a quality; the extension fetches every segment, handles continuity, and writes one file — DASH video and audio are muxed into a single MP4, and fMP4/CMAF HLS saves straight to MP4.</p>
+          <div class="feature-ord">01 · Finds every video</div>
+          <h3>One click shows what's on the page</h3>
+          <p>Open the page, click the toolbar icon, and see every video it found — including ones playing inside a player from another site, and ones that load after the page does.</p>
         </div>
         <div class="feature wide">
-          <div class="feature-ord">02 · Encryption</div>
-          <h3>AES‑128 CBC, decrypted natively</h3>
-          <p>When a playlist declares <code>#EXT-X-KEY</code>, the extension fetches the key, reads the IV, and decrypts each segment through the browser's Web Crypto API — no WASM, no ffmpeg, no server.</p>
+          <div class="feature-ord">02 · Works where you watch</div>
+          <h3>Webinar, training, and lecture players</h3>
+          <p>Built for the players work and school actually use — Vimeo, Wistia, Panopto, Vidyard, JW Player, Mux, Brightcove, ON24, Cloudflare Stream, and more. If you're signed in and can watch it, it can usually save it.</p>
         </div>
         <div class="feature">
-          <div class="feature-ord">03 · Iframe embeds</div>
-          <h3>Cross‑origin players</h3>
-          <p>Classifies embeds from Medius, ON24, Vimeo, Mux, Wistia, Brightcove, JW Player, Cloudflare Stream, Vidyard, Panopto, and generic <code>/embed/</code>, <code>/player/</code>, <code>/video/</code> paths — then resolves their manifests.</p>
+          <div class="feature-ord">03 · Your choice</div>
+          <h3>Pick the quality</h3>
+          <p>Grab the full‑HD version, a smaller file to save space, or just the audio for listening on the go. Picture and sound are combined into one file automatically.</p>
         </div>
         <div class="feature">
-          <div class="feature-ord">04 · Authentication</div>
-          <h3>JWT + cookie forwarding</h3>
-          <p>Extracts JWT tokens from iframe query strings and pulls session cookies via <code>chrome.cookies</code>. Authenticated streams are fetched with your existing credentials.</p>
+          <div class="feature-ord">04 · Tidy files</div>
+          <h3>Named after what it is</h3>
+          <p>Files are named after the session or video title — <i>Quarterly All‑Hands.mp4</i>, not <i>stream_8f3a.mpd</i>.</p>
         </div>
         <div class="feature">
-          <div class="feature-ord">05 · DRM aware</div>
-          <h3>Detects, never circumvents</h3>
-          <p>Surfaces Widevine, PlayReady, FairPlay (<code>skd://</code>), and Adobe Access markers in the manifest and warns clearly. Protected content is identified — not broken.</p>
+          <div class="feature-ord">05 · Slides too</div>
+          <h3>Bring the deck along</h3>
+          <p>If the page links the presentation — PDF, PowerPoint, or Keynote — it's listed right next to the video so you can save both.</p>
         </div>
         <div class="feature">
-          <div class="feature-ord">06 · Progress control</div>
-          <h3>Pause, resume, cancel</h3>
-          <p>Segment‑level progress: <code>SEG 42/128 · 33% · 2.4 MB/s · 1m left</code>. Pause a 200‑segment download, switch networks, resume where you left off.</p>
+          <div class="feature-ord">06 · In your control</div>
+          <h3>Pause, resume, keep going</h3>
+          <p>See progress and time left. Pause a long download and pick it up later. If the connection hiccups it retries on its own, and a moment of missing video won't ruin a two‑hour recording.</p>
         </div>
         <div class="feature">
-          <div class="feature-ord">07 · SPA‑safe</div>
-          <h3>MutationObserver built in</h3>
-          <p>React, Vue, Svelte, and any lazy‑loaded page: the detector re‑scans when new <code>&lt;video&gt;</code> elements or iframes appear. No refresh required.</p>
+          <div class="feature-ord">07 · Private</div>
+          <h3>Nothing leaves your browser</h3>
+          <p>No account, no analytics, no tracking. The extension only talks to the site you're downloading from — never to us.</p>
         </div>
         <div class="feature">
-          <div class="feature-ord">08 · Privacy</div>
-          <h3>Local‑only, no telemetry</h3>
-          <p>No analytics. No accounts. No third‑party network calls. Every parse, fetch, decrypt, and assembly happens inside your browser.</p>
-        </div>
-        <div class="feature wide">
-          <div class="feature-ord">09 · Platform APIs</div>
-          <h3>Asks the player, not the page</h3>
-          <p>Vimeo, Wistia, JW Player, Mux, Cloudflare Stream, Vidyard, and Panopto embeds resolve through each platform's own player API — the technique the open‑source <code>yt‑dlp</code> project uses — run inside the embed's frame with your existing session. Anything else falls back to network capture and embed parsing.</p>
-        </div>
-        <div class="feature wide">
-          <div class="feature-ord">10 · Modern HLS</div>
-          <h3>CMAF, byte ranges, signed URLs</h3>
-          <p>fMP4 playlists with <code>#EXT-X-MAP</code> init segments save as a playable MP4. <code>#EXT-X-BYTERANGE</code> segments are fetched with HTTP Range requests. When a CDN signs only the playlist URL, its token is carried onto segment and key requests.</p>
-        </div>
-        <div class="feature">
-          <div class="feature-ord">11 · Resilient</div>
-          <h3>One bad segment won't sink it</h3>
-          <p>Each segment retries with exponential backoff. If one stays unavailable, it's skipped and reported instead of failing a two‑hour download. Anvato and Uplynk ad segments are left out.</p>
-        </div>
-        <div class="feature">
-          <div class="feature-ord">12 · Deeper detection</div>
-          <h3>Reads player configs</h3>
-          <p>Finds streams in JW Player, Video.js, and Flowplayer setup code, Next.js and Nuxt page data, <code>&lt;mux-player&gt;</code> elements, JSON‑LD <code>embedUrl</code>, and <code>twitter:player:stream</code> cards.</p>
-        </div>
-        <div class="feature">
-          <div class="feature-ord">13 · Sessions &amp; slides</div>
-          <h3>Named files, slides included</h3>
-          <p>Downloads are named after the session or player title instead of <code>stream.mpd</code>, and linked slide decks (PDF, PPT, Key) are listed and saved alongside the video.</p>
+          <div class="feature-ord">08 · Fair play</div>
+          <h3>Respects copy protection</h3>
+          <p>Movies and shows from services like Netflix or Disney+ are copy‑protected. The extension recognizes that and tells you, instead of trying to break it.</p>
         </div>
       </div>
     </div>
   </section>
 
-  <!-- HOW IT WORKS / PIPELINE -->
+  <!-- HOW IT WORKS -->
   <section class="section" id="how">
     <div class="container">
       <div class="section-head">
-        <div class="section-kicker">0.02 — The pipeline</div>
-        <h2 class="section-title">From <em>click</em> to file<br>in six deliberate stages.</h2>
-        <p class="section-lede">The extension is six cooperating components — content detector, service worker, network layer, manifest parsers, segment pipeline, and a popup UI. Each stage does one thing.</p>
+        <div class="section-kicker">0.02 — How it works</div>
+        <h2 class="section-title">Three steps from<br>watching to <em>saved</em>.</h2>
+        <p class="section-lede">Nothing to set up or learn. Curious what happens behind the scenes? The <a href="#faq" style="color:var(--ember-2)">FAQ</a> has the technical details.</p>
       </div>
 
-      <div class="pipeline">
-<pre><span class="p-cmt">// content/detector.js — runs in every frame at document_idle</span>
-<span class="p-key">SCAN</span>      ── &lt;video&gt; · og:video · JSON‑LD VideoObject · data‑src · &lt;object&gt; · &lt;iframe&gt;
-<span class="p-key">CLASSIFY</span>  ── <span class="p-val">host</span> match (medius, vimeo, mux, wistia, brightcove) + <span class="p-val">path</span> heuristics
-<span class="p-key">OBSERVE</span>   ── MutationObserver re‑scan on DOM mutation
-
-<span class="p-cmt">// background/service-worker.js — MV3 coordinator</span>
-<span class="p-key">INTERCEPT</span> ── chrome.webRequest.onHeadersReceived → build per‑tab manifest map
-<span class="p-key">RESOLVE</span>   ── iframe URL → captured manifest · or fetch embed HTML · parse
-<span class="p-key">AUTH</span>      ── extract JWT(query) + chrome.cookies.getAll(origin) → headers
-<span class="p-key">EXPAND</span>    ── fetch master .m3u8 / .mpd → hls-parser / dash-parser
-<span class="p-key">DETECT</span>    ── Widevine · PlayReady · FairPlay UUIDs → DRM warning
-
-<span class="p-cmt">// utils/segment-downloader.js — parallel fetch + decrypt</span>
-<span class="p-key">FETCH</span>     ── parallel segment GETs (with retry, backoff)
-<span class="p-key">DECRYPT</span>   ── AES‑128 CBC via <span class="p-val">crypto.subtle</span> (per segment, per IV)
-<span class="p-key">ASSEMBLE</span>  ── Blob concat → chrome.downloads.download()
-<span class="p-key">REPORT</span>    ── postMessage segment progress → popup (pause · resume · cancel)</pre>
+      <div class="steps">
+        <div class="step">
+          <div class="step-num">01</div>
+          <div>
+            <h4>Open the video</h4>
+            <p>Go to the page with the video. On some sites it helps to press play first, so the video starts loading.</p>
+          </div>
+        </div>
+        <div class="step">
+          <div class="step-num">02</div>
+          <div>
+            <h4>Click the icon</h4>
+            <p>Click Video Downloader in your toolbar to see each video on the page. For a video inside an embedded player, click <b>Resolve Stream</b> to find it.</p>
+          </div>
+        </div>
+        <div class="step">
+          <div class="step-num">03</div>
+          <div>
+            <h4>Choose and save</h4>
+            <p>Pick a quality and press <b>Download</b>. The file lands in your Downloads folder, ready to watch offline.</p>
+          </div>
+        </div>
       </div>
     </div>
   </section>
@@ -1053,33 +1053,33 @@
     <div class="container">
       <div class="section-head">
         <div class="section-kicker">0.03 — Who it's for</div>
-        <h2 class="section-title">Built for people who need video<br>to stay <em>reachable</em>.</h2>
+        <h2 class="section-title">For anyone who needs a video<br>to stay <em>reachable</em>.</h2>
       </div>
 
       <div class="usecases">
         <div class="usecase">
+          <h4>Students &amp; lifelong learners</h4>
+          <p>Keep lectures, courses, and training sessions after the class portal closes. Review on a plane, on a slow connection, or months later.</p>
+        </div>
+        <div class="usecase">
+          <h4>Teams at work</h4>
+          <p>Save the all‑hands, the webinar, or the vendor demo — with the slides — so the people who missed it can catch up.</p>
+        </div>
+        <div class="usecase">
           <h4>Journalists &amp; researchers</h4>
-          <p>Archive primary‑source video before it disappears behind a paywall, a takedown, or a broken CDN. Keep a durable record you can cite, quote, and re‑review offline.</p>
+          <p>Archive primary‑source video before it disappears behind a paywall, a takedown, or a broken link. Keep a record you can cite and re‑review offline.</p>
         </div>
         <div class="usecase">
-          <h4>Educators &amp; learners</h4>
-          <p>Pull down training sessions, conference recordings, and university lectures for offline review. Field work, flights, rural bandwidth — the video travels with the learner.</p>
-        </div>
-        <div class="usecase">
-          <h4>Creators &amp; production teams</h4>
-          <p>Reclaim your own streams and embeds as source files for editing, captioning, highlight reels, and multi‑platform redistribution. Your content, your archive.</p>
+          <h4>Creators</h4>
+          <p>Get your own streams and embeds back as files for editing, captions, highlight reels, and sharing elsewhere. Your content, your archive.</p>
         </div>
         <div class="usecase">
           <h4>Compliance &amp; legal</h4>
-          <p>Capture webinars, depositions, regulatory briefings, and public hearings as evidence. Timestamps, sources, and the stream exactly as it was delivered.</p>
+          <p>Keep webinars, briefings, and public hearings exactly as they were shown, for records and evidence.</p>
         </div>
         <div class="usecase">
-          <h4>Accessibility workflows</h4>
-          <p>Download once; transcribe, caption, translate, and re‑time locally. Works with tools like Whisper and ffmpeg without depending on a platform's accessibility roadmap.</p>
-        </div>
-        <div class="usecase">
-          <h4>Engineers &amp; QA</h4>
-          <p>Reproduce playback bugs from real HLS and DASH sources. Inspect segment boundaries, IVs, codec fingerprints. Debug adaptive bitrate logic against actual production manifests.</p>
+          <h4>Accessibility</h4>
+          <p>Download once, then caption, transcribe, or translate with the tools you prefer — no waiting on a platform to add them.</p>
         </div>
       </div>
     </div>
@@ -1090,39 +1090,38 @@
     <div class="container">
       <div class="section-head">
         <div class="section-kicker">0.04 — Install</div>
-        <h2 class="section-title">Load unpacked.<br><em>Done.</em></h2>
-        <p class="section-lede">No build step. No package manager. No account. Download, load, use. The Chrome Web Store listing is in review.</p>
+        <h2 class="section-title">Installed in<br>about a <em>minute</em>.</h2>
+        <p class="section-lede">Free, and no account needed. While the Chrome Web Store listing is in review, it's added by hand in four quick steps.</p>
       </div>
 
       <div class="steps">
         <div class="step">
           <div class="step-num">01</div>
           <div>
-            <h4>Get the source</h4>
-            <p>Download the latest release zip, or clone the repository.</p>
-            <code>git clone https://github.com/ChiefInnovator/videodownloader.git</code>
+            <h4>Download it</h4>
+            <p>Download the <a href="https://github.com/ChiefInnovator/videodownloader/releases/latest" rel="noopener" style="color:var(--ember-2)">latest release</a> zip file and unzip it.</p>
           </div>
         </div>
         <div class="step">
           <div class="step-num">02</div>
           <div>
-            <h4>Open Chrome extensions</h4>
-            <p>Navigate to the extensions page and enable Developer mode.</p>
-            <code>chrome://extensions/</code>
+            <h4>Open your extensions page</h4>
+            <p>Type this into the address bar, then switch on <b>Developer mode</b> in the top‑right corner.</p>
+            <code>chrome://extensions</code>
           </div>
         </div>
         <div class="step">
           <div class="step-num">03</div>
           <div>
-            <h4>Load unpacked</h4>
-            <p>Click <b>Load unpacked</b>, select the unzipped release folder (or the cloned <code>videodownloader/</code> directory). The fire‑orange play icon appears in your toolbar.</p>
+            <h4>Add the extension</h4>
+            <p>Click <b>Load unpacked</b> and choose the folder you unzipped. The Video Downloader icon appears in your toolbar — pin it so it's easy to find.</p>
           </div>
         </div>
         <div class="step">
           <div class="step-num">04</div>
           <div>
-            <h4>Use it</h4>
-            <p>Navigate to a page with video. Click the toolbar icon. Download direct videos, or click <b>Resolve Stream</b> on iframe embeds to expand HLS/DASH manifests and pick quality.</p>
+            <h4>Save a video</h4>
+            <p>Go to a page with a video, click the icon, and press <b>Download</b>.</p>
           </div>
         </div>
       </div>
@@ -1135,10 +1134,10 @@
       <div class="ethics">
         <h3>Use it the way it was built.</h3>
         <p>
-          Video Downloader exists because legitimate content keeps getting harder to save — conferences that vanish, training portals that expire, courses that lock, journalism that gets taken down. This tool is for video you are authorized to access and have a reason to keep.
+          Video Downloader exists because legitimate video keeps getting harder to save — conferences that vanish, training portals that expire, courses that lock, journalism that gets taken down. It's for video you're allowed to access and have a reason to keep.
         </p>
         <p>
-          It does not attempt to break Widevine, PlayReady, or FairPlay. DRM is detected and respected. Respect copyright, platform terms of service, and the rights of creators. When in doubt, ask permission.
+          It doesn't try to break the copy protection used by services like Netflix, Disney+, or Apple TV — protected video is recognized and left alone. Respect copyright, the site's terms, and the people who made the video. When in doubt, ask permission.
         </p>
       </div>
     </div>
@@ -1150,48 +1149,65 @@
       <div class="section-head">
         <div class="section-kicker">0.05 — FAQ</div>
         <h2 class="section-title">Questions, <em>answered.</em></h2>
+        <p class="section-lede">Everyday questions first; the technical details follow.</p>
       </div>
 
       <div class="faq">
         <details open>
-          <summary>Can Video Downloader download AES‑128 encrypted HLS streams?</summary>
-          <p>Yes. When a master or media playlist declares AES‑128 encryption via <code>#EXT-X-KEY</code>, the extension fetches the key URI, reads the IV, downloads each segment, and decrypts using AES‑CBC through the browser's native Web Crypto API. Decrypted segments are concatenated into a single <code>.ts</code> file you can play in VLC or mpv, or remux to MP4 with <code>ffmpeg -i input.ts -c copy output.mp4</code>.</p>
+          <summary>What does Video Downloader do?</summary>
+          <p>It saves videos from web pages as a single file on your computer, so you can keep them and watch offline — webinars, training sessions, lectures, conference talks, and videos playing inside embedded players. Click the toolbar icon, pick a video, and press <b>Download</b>.</p>
         </details>
         <details>
-          <summary>Does it work with cross‑origin iframe embeds?</summary>
-          <p>Yes. The extension scans every <code>&lt;iframe&gt;</code> on the page, classifies each one by domain and path (Medius, ON24, Vimeo, Mux, Wistia, Brightcove, JW Player, Cloudflare Stream, Vidyard, Panopto, and generic <code>/embed/</code>, <code>/video/</code>, <code>/player/</code> paths), and resolves streams by asking the platform's own player API for Vimeo, Wistia, JW Player, Mux, Cloudflare Stream, Vidyard, and Panopto, then falling back to network‑level manifest capture and embed‑page parsing. JWT tokens from the iframe URL and session cookies from the origin are forwarded on manifest, segment, and key requests so authenticated streams just work.</p>
+          <summary>Is it really free? Does it track me?</summary>
+          <p>It's free, with no account, no ads, no analytics, and no tracking. Nothing about what you watch is sent anywhere — the extension only talks to the site you're downloading from, and everything else happens inside your browser. There is no server owned by the developer.</p>
         </details>
         <details>
-          <summary>Can it bypass Widevine, PlayReady, or FairPlay DRM?</summary>
-          <p>No. Video Downloader detects DRM‑protected content and clearly warns the user that it cannot be downloaded. The extension respects content protection — it does not attempt to circumvent Widevine, PlayReady, FairPlay, or any other DRM system. It is intended for legitimate offline viewing of content you are authorized to access.</p>
+          <summary>Which sites does it work with?</summary>
+          <p>Most sites that play video right in the page, plus the embedded players common at work and school: Vimeo, Wistia, Panopto, Vidyard, JW Player, Mux, Brightcove, ON24, Cloudflare Stream, Microsoft Medius, and others. If you're signed in and can watch it, it can usually save it. YouTube isn't supported.</p>
         </details>
         <details>
-          <summary>Does it support DASH (.mpd) streams?</summary>
-          <p>Yes. The extension parses DASH Media Presentation Description (<code>.mpd</code>) manifests — adaptation sets, representations, segment templates, and timelines — to enumerate available qualities. It downloads the chosen video representation plus the best audio track and muxes them into a single MP4 in the browser — no re‑encoding and no ffmpeg required.</p>
+          <summary>Can it download Netflix, Disney+, or other copy‑protected video?</summary>
+          <p>No. Those services use copy protection (DRM such as Widevine, PlayReady, and FairPlay). Video Downloader recognizes it and tells you the video can't be saved — it never tries to get around it. It's meant for video you're allowed to access and have a reason to keep.</p>
         </details>
         <details>
-          <summary>What browsers does it support?</summary>
-          <p>Any Chromium‑based browser with Manifest V3 support: Google Chrome 114+, Microsoft Edge 114+, Brave, Arc, Vivaldi, Opera, and similar. Firefox is not currently supported.</p>
-        </details>
-        <details>
-          <summary>Does it collect data, analytics, or telemetry?</summary>
-          <p>No. Video Downloader has no analytics, no telemetry, and no third‑party network calls. All processing — manifest parsing, segment fetching, decryption, and assembly — happens locally in your browser. There is no account, no sign‑in, and nothing is sent to any server owned by the developer.</p>
+          <summary>Which browsers does it work in?</summary>
+          <p>Google Chrome and Microsoft Edge (version 114 or newer), plus Brave, Arc, Vivaldi, Opera, and other Chromium‑based browsers. Firefox and Safari aren't supported yet.</p>
         </details>
         <details>
           <summary>How do I install it?</summary>
-          <p>Download the latest <code>videodownloader-vX.Y.Z.zip</code> from <a href="https://github.com/ChiefInnovator/videodownloader/releases/latest" rel="noopener">GitHub Releases</a> and unzip it. Open <code>chrome://extensions</code>, turn on Developer mode, click <b>Load unpacked</b>, and select the unzipped folder. The fire‑orange play icon appears in the toolbar.</p>
+          <p>Download the latest <code>videodownloader-vX.Y.Z.zip</code> from <a href="https://github.com/ChiefInnovator/videodownloader/releases/latest" rel="noopener">GitHub Releases</a> and unzip it. Open <code>chrome://extensions</code>, turn on <b>Developer mode</b>, click <b>Load unpacked</b>, and choose the unzipped folder. The Video Downloader icon appears in your toolbar. A Chrome Web Store listing is in review.</p>
         </details>
         <details>
-          <summary>Which video platforms can it resolve directly?</summary>
-          <p>For Vimeo, Wistia, JW Player, Mux, Cloudflare Stream, Vidyard, and Panopto embeds, the extension asks the platform's own public player API for the stream manifest, using your existing session — the same approach the open‑source <code>yt‑dlp</code> project uses. Any other player is still covered by network capture, embed‑page parsing, and player‑config detection (JW Player, Video.js, Flowplayer, Next.js and Nuxt page data). YouTube is not supported.</p>
+          <summary>My video saved as a .ts file. How do I turn it into an MP4?</summary>
+          <p>Some streams save as MPEG‑TS (<code>.ts</code>); most players, such as VLC, open them as‑is. Other streams, including DASH and fMP4/CMAF HLS, save straight to MP4. To convert a <code>.ts</code> file without losing quality, run <code>ffmpeg -i input.ts -c copy output.mp4</code> — it repackages the file in seconds without re‑encoding.</p>
         </details>
         <details>
-          <summary>How do I convert the downloaded .ts file to MP4?</summary>
-          <p>Classic HLS downloads save as MPEG‑TS (<code>.ts</code>); fMP4/CMAF HLS and DASH downloads are already MP4. To convert a <code>.ts</code> file, use ffmpeg. A fast, lossless remux: <code>ffmpeg -i input.ts -c copy output.mp4</code>. This repackages the MPEG‑TS container into MP4 without re‑encoding, so it finishes in seconds and preserves original quality.</p>
+          <summary>Technical: which streaming formats are supported?</summary>
+          <p>HLS (<code>.m3u8</code>) master and media playlists, including fMP4/CMAF playlists with <code>#EXT-X-MAP</code> init segments (saved as MP4) and <code>#EXT-X-BYTERANGE</code> segments fetched with HTTP Range requests. DASH (<code>.mpd</code>) with SegmentTemplate, SegmentTimeline, SegmentList, and SegmentBase — the chosen video representation and the best audio track are muxed into a single fragmented MP4 in the browser, with no re‑encoding and no ffmpeg. Direct files (MP4, WebM, and others) download as‑is. For live HLS, the segments currently in the playlist window are captured.</p>
+        </details>
+        <details>
+          <summary>Technical: can it download AES‑128 encrypted HLS streams?</summary>
+          <p>Yes. When a playlist declares <code>#EXT-X-KEY METHOD=AES-128</code>, the extension fetches the key, takes the IV from the playlist or derives it from the media sequence number, and decrypts each segment with AES‑CBC through the browser's Web Crypto API (<code>crypto.subtle</code>) — no WASM, no server. SAMPLE‑AES, FairPlay <code>skd://</code> keys, PlayReady/Widevine <code>KEYFORMAT</code>s, and Adobe Access (<code>#EXT-X-FAXS-CM</code>) are treated as DRM and refused.</p>
+        </details>
+        <details>
+          <summary>Technical: how does it handle cross‑origin iframe embeds and sign‑ins?</summary>
+          <p>The content script runs in every frame and classifies each <code>&lt;iframe&gt;</code> by domain (Medius, ON24, Vimeo, Mux, Wistia, Brightcove, JW Player, Cloudflare Stream, Vidyard, Panopto, and more) and by path (<code>/embed/</code>, <code>/video/</code>, <code>/player/</code>). For Vimeo, Wistia, JW Player, Mux, Cloudflare Stream, Vidyard, and Panopto it asks the platform's own public player API for the manifest — the approach the open‑source <code>yt‑dlp</code> project uses — fetched from inside the embed's frame so the platform sees its own cookies and origin. Otherwise it falls back to manifests captured from network traffic, then to parsing the embed page's HTML. JWT tokens from the iframe URL and session cookies (<code>chrome.cookies</code>) are forwarded on manifest, segment, and key requests; tokens stay in memory only.</p>
+        </details>
+        <details>
+          <summary>Technical: how does it find videos on a page?</summary>
+          <p>In layers: network interception (<code>chrome.webRequest</code>) of video MIME types and <code>.m3u8</code>/<code>.mpd</code> manifests; <code>&lt;video&gt;</code>, <code>&lt;source&gt;</code>, <code>&lt;object&gt;</code>, and <code>&lt;embed&gt;</code> elements; <code>og:video</code> (including extension‑less URLs typed by <code>og:video:type</code>), <code>twitter:player:stream</code>, and JSON‑LD VideoObject <code>contentUrl</code>/<code>embedUrl</code>; <code>data-*</code> attributes; media URLs in inline player setup code (JW Player, Video.js, Flowplayer) and framework data (Next.js <code>__NEXT_DATA__</code>, Nuxt); and <code>&lt;mux-player&gt;</code> elements. A MutationObserver re‑scans single‑page apps and lazy‑loaded players.</p>
+        </details>
+        <details>
+          <summary>Technical: how does it cope with long or flaky downloads?</summary>
+          <p>Segments download six at a time through a fetch‑strategy chain (page context, content script, then service worker). Each segment retries up to five times with exponential backoff capped at 20 seconds. A segment that stays unavailable is skipped and reported instead of failing the whole file — never the first segment or an init segment, and at most 10% of a download. When a CDN signs only the playlist URL, its query‑string token is carried onto segment and key requests. Anvato and Uplynk ad segments are dropped. Downloads can be paused, resumed, and cancelled.</p>
+        </details>
+        <details>
+          <summary>Technical: how is it built?</summary>
+          <p>A Chrome Manifest V3 extension in plain JavaScript ES modules — no build step, no npm dependencies. A content script detects media in every frame; the service worker intercepts network traffic, resolves embeds, parses HLS and DASH manifests, and orchestrates downloads; a segment downloader fetches, decrypts, and assembles; a small JS muxer combines DASH video and audio into one MP4; <code>chrome.downloads</code> saves the result. See <a href="https://github.com/ChiefInnovator/videodownloader/blob/main/docs/ARCHITECTURE.md" rel="noopener">ARCHITECTURE.md</a> for the full design.</p>
         </details>
         <details>
           <summary>Who built this?</summary>
-          <p>Video Downloader was built by <b>Rich Crane</b>, a Microsoft Most Valuable Professional, founder and Chief AI Officer of MILL5, and host of the <i>Inventing Fire with AI</i> podcast. It is part of the Inventing Fire with AI initiative exploring what can be built with AI‑assisted development.</p>
+          <p>Video Downloader was built by <b>Rich Crane</b>, a Microsoft Most Valuable Professional, Founder and Chief AI Officer of MILL5, and host of the <i>Inventing Fire with AI</i> podcast. It is part of the Inventing Fire with AI initiative exploring what can be built with AI‑assisted development.</p>
         </details>
       </div>
     </div>
@@ -1201,7 +1217,7 @@
   <section class="section" id="author">
     <div class="container">
       <div class="author-block">
-        <div class="avatar" aria-hidden="true">RC</div>
+        <div class="avatar"><img src="images/inventing-fire-mark.png" alt="Inventing Fire with AI" width="60" height="60"></div>
         <div>
           <h4>Built by Rich Crane — Microsoft MVP, MILL5.</h4>
           <p>Part of the <i>Inventing Fire with AI</i> initiative. The same workshop behind <a href="https://chiefinnovator.github.io/macedgelight/" style="color:var(--ember-2);text-decoration:none;border-bottom:1px solid rgba(255,179,71,0.4)">MacEdgeLight</a> and <a href="https://inventingfirewith.ai/cutandmove/" style="color:var(--ember-2);text-decoration:none;border-bottom:1px solid rgba(255,179,71,0.4)">Cut &amp; Move</a>.</p>
@@ -1222,9 +1238,9 @@
   <section class="final-cta">
     <div class="container">
       <h2>Save what you're<br><em>actually</em> watching.</h2>
-      <p>Free. No account. No telemetry. Works on any Chromium browser.</p>
+      <p>Free. No account. No tracking. Works in Chrome, Edge, and other Chromium browsers.</p>
       <div class="hero-cta" style="justify-content:center">
-        <a class="btn btn-primary" href="https://github.com/ChiefInnovator/videodownloader/releases/latest" rel="noopener">Download v2.3.0</a>
+        <a class="btn btn-primary" href="https://github.com/ChiefInnovator/videodownloader/releases/latest" rel="noopener">Download v2.4.0</a>
         <a class="btn btn-secondary" href="https://github.com/ChiefInnovator/videodownloader" rel="noopener">Source on GitHub</a>
       </div>
     </div>

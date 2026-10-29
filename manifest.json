@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Video Downloader",
-  "version": "2.3.0",
+  "version": "2.4.0",
   "description": "Detect, extract, and download video content from web pages for offline viewing. By Rich Crane — Inventing Fire with AI.",
   "author": "Rich Crane",
   "homepage_url": "https://github.com/chiefinnovator",
