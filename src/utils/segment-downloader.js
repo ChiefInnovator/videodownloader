@@ -171,7 +171,7 @@ async function runPipeline(
       }
     }
 
-    const mimeType = outputExt === 'mp4' ? 'video/mp4' : 'video/mp2t';
+    const mimeType = { mp4: 'video/mp4', m4a: 'audio/mp4' }[outputExt] || 'video/mp2t';
     const blob = new Blob(parts, { type: mimeType });
 
     job.state = 'complete';

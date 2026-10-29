@@ -6,7 +6,7 @@ The core motivation: a free video downloader that doesn't track what you are doi
 
 Video Downloader is developed by Richard Crane (Microsoft MVP, founder and Chief AI Officer of MILL5, host of the *Inventing Fire with AI* podcast). It is part of the Inventing Fire with AI initiative. The extension respects content protection — it detects Widevine, PlayReady, and FairPlay DRM and warns the user rather than attempting to circumvent it.
 
-The current release is v2.3.1 (published 2026-10-29). It is distributed as a Chrome Manifest V3 extension via GitHub Releases (the Chrome Web Store listing is in review).
+The current release is v2.4.0 (published 2026-10-29). It is distributed as a Chrome Manifest V3 extension via GitHub Releases (the Chrome Web Store listing is in review).
 
 ## Install
 
@@ -36,6 +36,7 @@ The current release is v2.3.1 (published 2026-10-29). It is distributed as a Chr
 - **Signed‑URL CDNs** — when a CDN signs only the playlist URL, its query‑string token is carried onto segment and key requests.
 - **Resilient downloads** — segments retry with exponential backoff; one that stays unavailable is skipped and reported instead of failing the whole download. Anvato and Uplynk ad segments are dropped.
 - **Player‑config detection** — finds media in JW Player, Video.js, and Flowplayer setup code, Next.js and Nuxt page data, `<mux-player>` elements, JSON‑LD `embedUrl`, and `twitter:player:stream` cards.
+- **Audio only and copy link** — DASH streams with a separate audio track offer an "Audio only (.m4a)" choice (the original AAC track, no re‑encoding). Every detected video has a **Copy link** button for pasting its direct or manifest URL into a player such as VLC.
 - **Session‑titled files and slides** — downloads are named after the session or player title, and linked slide decks (PDF, PPT, Key) are listed and saved alongside the video.
 - **Authentication forwarding** — extracts JWT tokens from iframe URL query parameters and pulls session cookies via `chrome.cookies.getAll()`. Applied to all manifest, segment, and key requests.
 - **DRM detection** — surfaces Widevine, PlayReady, FairPlay (`skd://`), and Adobe Access markers in manifests and clearly warns the user. Does not attempt to bypass DRM.

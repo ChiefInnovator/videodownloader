@@ -26,6 +26,9 @@ Detect, extract, and download video content from web pages for offline viewing �
 - Configurable default format, quality, and download location
 - SPA-compatible via MutationObserver for dynamically loaded content
 - **Session-titled files** — names downloads from the page's session/player title (e.g. `GH-300 Tech Prep.mp4`) instead of `stream.mpd`
+- **Audio only** — DASH streams with a separate audio track offer "Audio only (.m4a)": the original AAC track wrapped as M4A, no re-encoding
+- **Copy link** — copy any detected video's direct or manifest URL (e.g. to open in VLC)
+- **Reduced motion** — the popup honors the OS "reduce motion" setting
 - **Slides download** — detects slide-deck links (PDF/PPT/Key) in any frame, lists them, and downloads them alongside the video
 
 ## Project Structure

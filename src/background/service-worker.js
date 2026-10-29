@@ -572,8 +572,11 @@ async function downloadDashStream(opts) {
     return entry;
   });
 
-  const ext = 'mp4';
-  const finalFilename = filename || `video_${Date.now()}.${ext}`;
+  // Audio-only (an audio representation was picked) saves as .m4a.
+  const ext = videoRep ? 'mp4' : 'm4a';
+  const finalFilename = filename
+    ? filename.replace(/\.mp4$/i, `.${ext}`)
+    : `video_${Date.now()}.${ext}`;
 
   return new Promise((resolve, reject) => {
     startSegmentDownload({

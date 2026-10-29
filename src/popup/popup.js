@@ -264,6 +264,8 @@ function renderVideoItem(video, idx, tabId) {
           </svg>
           Download
         </button>
+        <button type="button" class="btn btn-sm btn-secondary btn-copy"
+                title="Copy the video's direct link (paste it into VLC or another player)">Copy link</button>
       `}
     </div>
     <div class="progress-wrap" id="progress-${itemId}">
@@ -279,6 +281,17 @@ function renderVideoItem(video, idx, tabId) {
 
   // Pending videos have no download action
   if (isPending) return;
+
+  const copyBtn = li.querySelector('.btn-copy');
+  copyBtn?.addEventListener('click', async () => {
+    try {
+      await navigator.clipboard.writeText(video.url);
+      copyBtn.textContent = 'Copied';
+    } catch {
+      copyBtn.textContent = 'Copy failed';
+    }
+    setTimeout(() => { copyBtn.textContent = 'Copy link'; }, 1500);
+  });
 
   // Expand stream qualities
   if (isHls) expandHlsQualities(video, itemId, tabId);
@@ -488,7 +501,9 @@ async function expandDashQualities(video, itemId, tabId) {
     }
 
     const reps = result?.video || [];
-    if (reps.length <= 1) {
+    // Separate audio track → offer an audio-only download (.m4a, no re-encoding)
+    const audio = reps.length > 0 ? (result?.audio || [])[0] : null;
+    if (reps.length + (audio ? 1 : 0) <= 1) {
       select.remove();
       return;
     }
@@ -499,6 +514,14 @@ async function expandDashQualities(video, itemId, tabId) {
       opt.value = r.id;
       opt.dataset.url = video.url; // MPD URL
       opt.textContent = r.label;
+      select.appendChild(opt);
+    }
+    if (audio) {
+      const opt = document.createElement('option');
+      opt.value = audio.id;
+      opt.dataset.url = video.url;
+      opt.dataset.audioOnly = '1';
+      opt.textContent = 'Audio only (.m4a)';
       select.appendChild(opt);
     }
   } catch {
@@ -573,7 +596,8 @@ async function onStreamDownload(video, itemId, tabId, streamType) {
   progressWrap.classList.add('active');
 
   const jobId = `stream_${Date.now()}_${itemId}`;
-  const ext = streamType === 'dash' ? 'mp4' : 'ts';
+  const audioOnly = select?.selectedOptions?.[0]?.dataset.audioOnly === '1';
+  const ext = audioOnly ? 'm4a' : streamType === 'dash' ? 'mp4' : 'ts';
   // Prefer the session/page title ("GH-300 Tech Prep.mp4"); chrome.downloads
   // uniquifies duplicates, so the timestamp is only needed for the fallback.
   const titled = safeFilename(video._name);
