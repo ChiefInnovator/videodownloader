@@ -452,7 +452,17 @@
           if (!res.ok) throw new Error(`${res.status}`);
           return res.arrayBuffer();
         })
-        .then(buf => sendResponse({ data: Array.from(new Uint8Array(buf)) }))
+        .then(buf => {
+          // Messages are JSON-serialized; base64 is far smaller and faster
+          // than a per-byte number array.
+          const bytes = new Uint8Array(buf);
+          if (typeof bytes.toBase64 === 'function') return sendResponse({ b64: bytes.toBase64() });
+          let bin = '';
+          for (let i = 0; i < bytes.length; i += 0x8000) {
+            bin += String.fromCharCode.apply(null, bytes.subarray(i, i + 0x8000));
+          }
+          sendResponse({ b64: btoa(bin) });
+        })
         .catch(err => sendResponse({ error: err.message }));
       return true;
     }
