@@ -62,7 +62,16 @@ const INIT_SEGMENT_RE = /\.(m4i|m4s|m4v|m4a)(\?|#|$)/i;
  */
 const SUB_RESOURCE_NAMES = /\/(index|chunklist|media|segment|init|initSection)\d*\.m3u8(\?|#|$)/i;
 
-/** 'dash' | 'hls' | null for a request URL + content type. */
+/**
+ * Path part of a URL. Extension checks must ignore the query string, which
+ * can embed other URLs — ON24's logstream analytics beacon ends with
+ * "&streamsourceurl=…/stream.mpd" and was being listed as a DASH stream.
+ */
+function urlPath(url) {
+  try { return new URL(url).pathname; } catch { return url; }
+}
+
+/** 'dash' | 'hls' | null for a request URL path + content type. */
 function streamTypeOf(url, contentType = '') {
   if (DASH_URL_RE.test(url) || DASH_MIME_RE.test(contentType)) return 'dash';
   if (MANIFEST_URL_RE.test(url) || HLS_MIME_RE.test(contentType)) return 'hls';
@@ -79,8 +88,9 @@ function recordNetworkVideo(details, contentType = '', contentLength = null) {
 
   const isVideoMime = VIDEO_CONTENT_TYPES.some(t =>
     contentType.toLowerCase().includes(t));
-  const isVideoExt = VIDEO_URL_RE.test(details.url);
-  const streamType = streamTypeOf(details.url, contentType);
+  const path = urlPath(details.url);
+  const isVideoExt = VIDEO_URL_RE.test(path);
+  const streamType = streamTypeOf(path, contentType);
   const isManifest = streamType !== null;
 
   if (!isVideoMime && !isVideoExt) return;
@@ -106,9 +116,9 @@ function recordNetworkVideo(details, contentType = '', contentLength = null) {
   const tabMap = networkVideos.get(details.tabId);
 
   // Skip individual segments, init segments, keys, and sub-resource playlists
-  if (SEGMENT_URL_RE.test(details.url) || KEY_URL_RE.test(details.url)) return;
-  if (INIT_SEGMENT_RE.test(details.url)) return;
-  if (SUB_RESOURCE_NAMES.test(details.url)) return;
+  if (SEGMENT_URL_RE.test(path) || KEY_URL_RE.test(path)) return;
+  if (INIT_SEGMENT_RE.test(path)) return;
+  if (SUB_RESOURCE_NAMES.test(path)) return;
 
   const existing = tabMap.get(details.url);
   if (!existing) {
@@ -142,7 +152,7 @@ function recordNetworkVideo(details, contentType = '', contentLength = null) {
 // from any frame, even if response headers never reach us.
 chrome.webRequest.onBeforeRequest.addListener(
   (details) => {
-    if (MANIFEST_URL_RE.test(details.url)) recordNetworkVideo(details);
+    if (MANIFEST_URL_RE.test(urlPath(details.url))) recordNetworkVideo(details);
   },
   { urls: ['<all_urls>'] },
 );
@@ -578,6 +588,16 @@ async function handleMessage(msg, _sender) {
     case 'getNetworkVideos': {
       const tabId = msg.tabId;
       const map = networkVideos.get(tabId);
+      return { videos: map ? Array.from(map.values()) : [] };
+    }
+
+    case 'registerManifests': {
+      // Manifests the popup found in the page's Resource Timing — recovers
+      // streams requested before this worker started (or restarted).
+      for (const m of msg.manifests || []) {
+        recordNetworkVideo({ tabId: msg.tabId, frameId: m.frameId, url: m.url });
+      }
+      const map = networkVideos.get(msg.tabId);
       return { videos: map ? Array.from(map.values()) : [] };
     }
 

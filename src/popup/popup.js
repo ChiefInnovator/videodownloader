@@ -7,7 +7,7 @@
  */
 
 import { formatBytes, qualityLabel, extFromUrl, extFromMime, filenameFromUrl } from '../utils/formats.js';
-import { collectPageContext, pickPageTitle, mergeSlides, safeFilename, isGenericName } from '../utils/page-context.js';
+import { collectPageContext, pickPageTitle, mergeSlides, mergeManifests, safeFilename, isGenericName } from '../utils/page-context.js';
 
 // ── DOM refs ────────────────────────────────────────────────────────
 
@@ -22,7 +22,7 @@ const slidesSection = document.getElementById('slides-section');
 const slidesListEl = document.getElementById('slides-list');
 
 /** Title and slide decks for the active tab (see page-context.js). */
-let pageContext = { title: '', slides: [] };
+let pageContext = { title: '', slides: [], manifests: [] };
 
 /** Slide URLs already downloaded while this popup is open. */
 const downloadedSlides = new Set();
@@ -85,7 +85,18 @@ async function loadVideos() {
 
   const contentVideos = contentResult.status === 'fulfilled' ? contentResult.value?.videos || [] : [];
   const contentIframes = contentResult.status === 'fulfilled' ? contentResult.value?.iframes || [] : [];
-  const networkVideos = networkResult.status === 'fulfilled' ? networkResult.value?.videos || [] : [];
+  let networkVideos = networkResult.status === 'fulfilled' ? networkResult.value?.videos || [] : [];
+
+  // Re-register manifests the page already loaded but the worker no longer
+  // remembers (it is suspended when idle and reset on extension reload).
+  const known = new Set(networkVideos.map(v => v.url));
+  const missing = pageContext.manifests.filter(m => !known.has(m.url));
+  if (missing.length) {
+    try {
+      const res = await chrome.runtime.sendMessage({ action: 'registerManifests', tabId: tab.id, manifests: missing });
+      networkVideos = res?.videos || networkVideos;
+    } catch { /* keep what we have */ }
+  }
 
   // Filter out sub-resources (variant playlists, init segments) that
   // are children of a master manifest — they clutter the UI.
@@ -110,6 +121,10 @@ async function loadVideos() {
     // Don't show iframes whose URL we already have as a direct video
     if (!seen.has(iframe.url)) iframes.push(iframe);
   }
+
+  // Main streams first, so the session title goes to the real video.
+  directVideos.sort((a, b) => Number(isStreamVideo(b)) - Number(isStreamVideo(a)));
+  assignNames(directVideos);
 
   const totalCount = directVideos.length + iframes.length;
   const slideCount = pageContext.slides.length;
@@ -141,6 +156,31 @@ async function loadVideos() {
   }
 }
 
+function isStreamVideo(video) {
+  if (video.streamType === 'hls' || video.streamType === 'dash') return true;
+  const ext = extFromUrl(video.url);
+  return !video.streamType && (ext === 'm3u8' || ext === 'mpd');
+}
+
+/**
+ * Give every card a distinct name: its own title, else the session title
+ * (main stream first), else a meaningful URL filename; repeats get " (2)".
+ */
+function assignNames(videos) {
+  const seen = new Map();
+  for (const video of videos) {
+    const ext = extFromUrl(video.url) || extFromMime(video.mime) || 'mp4';
+    const urlName = filenameFromUrl(video.url, ext);
+    let base = video.title;
+    if (!base && isStreamVideo(video)) base = pageContext.title;
+    if (!base && !isGenericName(urlName)) base = urlName.replace(/\.\w{2,5}$/, '');
+    if (!base) base = pageContext.title || 'video';
+    const count = (seen.get(base) || 0) + 1;
+    seen.set(base, count);
+    video._name = count > 1 ? `${base} (${count})` : base;
+  }
+}
+
 /** Collect the video title and slide links from every frame of the tab. */
 async function loadPageContext(tabId) {
   let frames = [];
@@ -149,9 +189,9 @@ async function loadPageContext(tabId) {
       target: { tabId, allFrames: true },
       func: collectPageContext,
     });
-    frames = results.map(r => r.result).filter(Boolean);
+    frames = results.filter(r => r.result).map(r => ({ ...r.result, frameId: r.frameId }));
   } catch { /* restricted page — no context */ }
-  return { title: pickPageTitle(frames), slides: mergeSlides(frames) };
+  return { title: pickPageTitle(frames), slides: mergeSlides(frames), manifests: mergeManifests(frames) };
 }
 
 function showEmpty(msg) {
@@ -172,18 +212,18 @@ function renderVideoItem(video, idx, tabId) {
   const isHls = video.streamType === 'hls' || (!video.streamType && ext === 'm3u8');
   const isDash = video.streamType === 'dash' || (!video.streamType && ext === 'mpd');
   const isStream = isHls || isDash;
-  const title = video.title
-    || (isPending ? 'Video (not yet playing)' : '')
-    || (isStream && pageContext.title)
-    || filenameFromUrl(video.url, ext);
+  const title = isPending ? (video.title || 'Video (not yet playing)') : video._name;
   const itemId = `vid-${idx}`;
 
   if (isStream) li.classList.add('stream-item');
 
-  // Thumbnail
+  // Thumbnail: poster, else an icon for the file type that will be saved
   let thumbHtml;
   if (video.poster) {
     thumbHtml = `<img class="video-thumb" src="${escapeAttr(video.poster)}" alt="">`;
+  } else if (!isPending) {
+    const saved = isDash ? 'MP4' : isHls ? 'TS' : ext.toUpperCase();
+    thumbHtml = `<div class="video-thumb-placeholder">${fileIcon(saved)}</div>`;
   } else {
     thumbHtml = `<div class="video-thumb-placeholder">
       <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor"
@@ -482,9 +522,7 @@ async function onDirectDownload(video, itemId, tabId) {
 
   try {
     const ext = extFromUrl(video.url) || extFromMime(video.mime) || 'mp4';
-    const urlName = filenameFromUrl(video.url, ext);
-    const titled = safeFilename(pageContext.title);
-    const filename = titled && isGenericName(urlName) ? `${titled}.${ext}` : urlName;
+    const filename = `${safeFilename(video._name) || `video_${Date.now()}`}.${ext}`;
 
     const result = await chrome.runtime.sendMessage({
       action: 'download',
@@ -538,7 +576,7 @@ async function onStreamDownload(video, itemId, tabId, streamType) {
   const ext = streamType === 'dash' ? 'mp4' : 'ts';
   // Prefer the session/page title ("GH-300 Tech Prep.mp4"); chrome.downloads
   // uniquifies duplicates, so the timestamp is only needed for the fallback.
-  const titled = safeFilename(pageContext.title || video.title);
+  const titled = safeFilename(video._name);
   const filename = titled ? `${titled}.${ext}` : `video_${Date.now()}.${ext}`;
 
   downloadSlides(tabId);
@@ -632,11 +670,7 @@ function renderSlideItem(slide, idx, tabId) {
   const name = slideFilename(slide);
   li.innerHTML = `
     <div class="video-info">
-      <div class="video-thumb-placeholder">
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-             stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
-             <polyline points="14 2 14 8 20 8"/></svg>
-      </div>
+      <div class="video-thumb-placeholder">${fileIcon(slide.ext.toUpperCase())}</div>
       <div class="video-details">
         <div class="video-title" title="${escapeAttr(name)}">${escapeHtml(truncate(name, 50))}</div>
         <div class="video-meta"><span class="badge">${escapeHtml(slide.ext.toUpperCase())}</span><span>${escapeHtml(truncate(slide.label, 30))}</span></div>
@@ -774,6 +808,24 @@ function showProgressError(itemId, message) {
   if (text) text.textContent = `Error: ${message}`;
   if (fill) { fill.classList.add('error'); fill.style.width = '100%'; }
   if (progressWrap) progressWrap.classList.add('active');
+}
+
+const FILE_ICON_COLORS = {
+  PDF: '#e5484d', PPT: '#e8590c', PPTX: '#e8590c', ODP: '#e8590c', KEY: '#1c7ed6',
+  MP4: '#7c5cff', TS: '#7c5cff', WEBM: '#7c5cff', MKV: '#7c5cff', OGV: '#7c5cff',
+};
+
+/** Document icon with a colored type label ("PDF", "MP4", …). */
+function fileIcon(label) {
+  const text = escapeHtml(label.slice(0, 4));
+  const color = FILE_ICON_COLORS[label] || '#868e96';
+  return `<svg class="file-icon" width="30" height="36" viewBox="0 0 30 36" role="img" aria-label="${text} file">
+    <path d="M5 1h14l8 8v24a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V3a2 2 0 0 1 2-2z" fill="#f1f3f5"/>
+    <path d="M19 1v6a2 2 0 0 0 2 2h6z" fill="#ced4da"/>
+    <rect x="0" y="18" width="25" height="11" rx="2" fill="${color}"/>
+    <text x="12.5" y="26.3" text-anchor="middle" font-size="7.5" font-weight="700"
+          font-family="system-ui, -apple-system, sans-serif" fill="#fff">${text}</text>
+  </svg>`;
 }
 
 function escapeHtml(str) {

@@ -360,7 +360,8 @@
 
   function isVideoUrl(url) {
     if (!url) return false;
-    return VIDEO_EXT_RE.test(url);
+    // Test the path only: query strings can embed other video URLs.
+    try { return VIDEO_EXT_RE.test(new URL(url, location.href).pathname); } catch { return false; }
   }
 
   function addSource(rawUrl, videoEl, mime) {
