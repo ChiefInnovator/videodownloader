@@ -51,7 +51,17 @@ export function collectPageContext() {
     slides.push({ url: url.href, label: label.slice(0, 80) || file, ext, file });
   }
 
-  return { isTop, docTitle, dialogTitle, hasVideo: !!document.querySelector('video'), slides };
+  // Manifests this frame already requested. Players fetch them once at
+  // startup; the service worker forgets them when Chrome suspends it or the
+  // extension reloads, so the popup recovers them from Resource Timing.
+  const manifests = [];
+  for (const e of performance.getEntriesByType('resource')) {
+    let url;
+    try { url = new URL(e.name); } catch { continue; }
+    if (/^https?:$/.test(url.protocol) && /\.(mpd|m3u8)$/i.test(url.pathname)) manifests.push(url.href);
+  }
+
+  return { isTop, docTitle, dialogTitle, hasVideo: !!document.querySelector('video'), slides, manifests };
 }
 
 /** Choose the best video title from per-frame results. */
@@ -67,6 +77,15 @@ export function pickPageTitle(frames) {
 export function mergeSlides(frames) {
   const byUrl = new Map();
   for (const f of frames) for (const s of f.slides || []) byUrl.set(s.url, s);
+  return [...byUrl.values()];
+}
+
+/** Manifest URLs from all frames, with the frame that requested each. */
+export function mergeManifests(frames) {
+  const byUrl = new Map();
+  for (const f of frames) {
+    for (const url of f.manifests || []) if (!byUrl.has(url)) byUrl.set(url, { url, frameId: f.frameId ?? 0 });
+  }
   return [...byUrl.values()];
 }
 
