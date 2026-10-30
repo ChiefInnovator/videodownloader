@@ -70,6 +70,21 @@ videodownloader/
 
 ## Local Testing
 
+Run repeatable regression tests with Node 24 (no npm install):
+
+```bash
+node --experimental-vm-modules --test --test-timeout=10000 tests/*.test.mjs
+```
+
+These execute production popup/worker modules with Chrome API and DOM doubles,
+real parsers/fetch strategies/decryption/assembly, and deterministic media bytes.
+They are API-contract integration tests, not a real Chromium extension session.
+See [test coverage and browser gaps](tests/README.md).
+
+Iframe network discovery requires the requesting frame to belong to the selected
+embed or its descendants. A shared origin alone is insufficient; if navigation
+metadata is unavailable, resolution uses the platform API or embed HTML instead.
+
 ### 1. Generate Icons (optional — pre-built icons included)
 
 ```bash

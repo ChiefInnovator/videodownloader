@@ -58,9 +58,9 @@ Long-lived Manifest V3 service worker — the central coordinator:
 - **Badge management** — shows video count on the extension icon per tab.
 - **Iframe stream resolution** — when the popup requests it, resolves a cross-origin iframe embed:
   1. For a known platform (Vimeo, Wistia, JW Player, Mux, Cloudflare Stream, Vidyard, Panopto), asks the platform's player API for the manifest (`platform-resolvers.js`), fetching from inside the embed's frame when `webNavigation.getAllFrames` finds it.
-  2. Checks for manifests already captured via network interception that belong to this embed — requested by its frame (or a frame inside it) or served from its origin. Other players' manifests on the page are ignored.
+  2. Checks for manifests already captured via network interception that belong to this embed — requested by its frame (or a frame inside it). Shared origins are not evidence of frame ownership; absent navigation metadata, skip the network shortcut and parse the embed instead. Other players' manifests on the page are ignored.
   3. Falls back to fetching the embed page HTML and parsing for manifest URLs.
-  3. Detects DRM indicators (Widevine/PlayReady/FairPlay UUIDs).
+  4. Detects DRM indicators (Widevine/PlayReady/FairPlay UUIDs).
 - **Authentication forwarding** — extracts JWT tokens from iframe URL query parameters and retrieves session cookies via `chrome.cookies.getAll()`. Builds auth headers for all manifest/segment/key fetches.
 - **HLS expansion** — fetches M3U8 master playlists, parses variants, and probes first variant for AES-128 encryption or DRM.
 - **DASH expansion** — fetches MPD manifests and parses them via `dash-parser.js`.
@@ -182,3 +182,7 @@ Tokens are held in memory only — never persisted to storage.
 - No external services or analytics are used.
 - Content script uses a guard variable to prevent double-injection.
 - AES-128 decryption uses the Web Crypto API — no custom crypto implementations.
+
+## Regression coverage
+
+`tests/` exercises actual popup and worker modules in isolated Node VM realms, with Chrome API/DOM doubles and deterministic fetch fixtures. It checks saved blob bytes, per-frame messaging, iframe ownership, signed URLs, pause/resume/cancel, AES-128 initialization, and DASH offsets. See `tests/README.md` for scope, release-package reproduction, and real-browser gaps.

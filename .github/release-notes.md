@@ -13,3 +13,15 @@ Open a page with a video, play it for a few seconds, click the toolbar icon, cho
 
 Works in Chrome, Edge, Brave, Arc, Vivaldi, and other Chromium browsers (114+).
 
+## Corrective patch: iframe stream attribution
+
+Captured network manifests are now attributed to the selected embed frame or
+its descendants. Sharing an origin, matching an origin prefix, or missing
+navigation metadata can no longer cause another player's stream to be selected.
+Platform API and embed HTML fallback remain available.
+
+Validation: 15 automated production-module regression tests pass with Chrome API
+and DOM doubles, covering single-variant HLS byte assembly, multi-frame popup
+discovery, frame attribution, pause/resume/cancellation, signed URLs, AES-128 and
+DASH timelines. Actual Chrome extension execution remains unverified in the
+release preparation environment; see tests/README.md in the source repository.

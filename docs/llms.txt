@@ -6,7 +6,7 @@ The core motivation: a free video downloader that doesn't track what you are doi
 
 Video Downloader is developed by Richard Crane (Microsoft MVP, founder and Chief AI Officer of MILL5, host of the *Inventing Fire with AI* podcast). It is part of the Inventing Fire with AI initiative. The extension respects content protection — it detects Widevine, PlayReady, and FairPlay DRM and warns the user rather than attempting to circumvent it.
 
-The current release is v2.4.1 (published 2026-10-29). It is distributed as a Chrome Manifest V3 extension via GitHub Releases (the Chrome Web Store listing is in review).
+The current release is v2.4.2 (published 2026-10-30). It is distributed as a Chrome Manifest V3 extension via GitHub Releases (the Chrome Web Store listing is in review).
 
 ## Install
 
@@ -31,7 +31,7 @@ The current release is v2.4.1 (published 2026-10-29). It is distributed as a Chr
 - **HLS (.m3u8) support** — master and media playlist parsing, variant selection, segment enumeration. fMP4/CMAF playlists (`#EXT-X-MAP`) save as MP4; `#EXT-X-BYTERANGE` segments are fetched with HTTP Range requests.
 - **DASH (.mpd) support** — adaptation set and representation parsing, segment template and timeline support. Downloads the chosen video representation plus the best audio track and muxes them into a single MP4 in the browser (no re‑encoding, no ffmpeg). Classic HLS downloads save as MPEG‑TS (`.ts`).
 - **AES‑128 CBC decryption** — fetches `#EXT-X-KEY` URIs, reads IVs, decrypts each segment via the browser's Web Crypto API (`crypto.subtle`). No WASM, no ffmpeg, no server.
-- **Cross‑origin iframe resolution** — classifies embeds by domain (Medius, ON24, Vimeo, Mux, Wistia, Brightcove) and path keywords (`/embed/`, `/video/`, `/player/`, `/video-aes/`), then resolves manifests via captured network traffic and embed‑page parsing.
+- **Cross‑origin iframe resolution** — classifies embeds by domain (Medius, ON24, Vimeo, Mux, Wistia, Brightcove) and path keywords (`/embed/`, `/video/`, `/player/`, `/video-aes/`), then resolves manifests via captured network traffic attributed to the embed frame or its descendants, and embed‑page parsing. A shared origin alone does not establish ownership.
 - **Platform API resolution** — Vimeo, Wistia, JW Player, Mux, Cloudflare Stream, Vidyard, and Panopto embeds are resolved through each platform's own public player API (the approach used by the open‑source yt‑dlp project), fetched from inside the embed's frame with the user's existing session.
 - **Signed‑URL CDNs** — when a CDN signs only the playlist URL, its query‑string token is carried onto segment and key requests.
 - **Resilient downloads** — segments retry with exponential backoff; one that stays unavailable is skipped and reported instead of failing the whole download. Anvato and Uplynk ad segments are dropped.
