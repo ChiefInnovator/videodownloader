@@ -443,7 +443,8 @@ async function resolveIframe(iframeUrl, tabId) {
   }
 
   // Strategy 1: manifests this embed already loaded — requested by its
-  // frame (or a frame inside it), or served from its origin. Manifests from
+  // frame (or a frame inside it). Sharing an origin does not prove that a
+  // manifest belongs to this player. Manifests from
   // other players on the page are excluded so one embed can't resolve to
   // another's video.
   const tabManifests = networkManifests.get(tabId);
@@ -452,9 +453,9 @@ async function resolveIframe(iframeUrl, tabId) {
     const matchingManifests = [];
     for (const [url, info] of tabManifests) {
       if (SUB_RESOURCE_NAMES.test(url)) continue;
-      const sameOrigin = url.startsWith(iframeOrigin);
+      const sameOrigin = new URL(url).origin === iframeOrigin;
       const fromEmbed = embedFrames.includes(info.frameId);
-      if (!sameOrigin && !fromEmbed) continue;
+      if (!fromEmbed) continue;
       // Same-origin manifests first; CDN manifests (e.g. akamaized.net) after
       if (sameOrigin) matchingManifests.unshift(url);
       else matchingManifests.push(url);
