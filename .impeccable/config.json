@@ -1,0 +1,53 @@
+{
+  "detector": {
+    "ignoreRules": [],
+    "ignoreFiles": [],
+    "ignoreValues": [
+      {
+        "rule": "italic-serif-display",
+        "value": "*",
+        "files": [
+          "docs/index.html"
+        ],
+        "createdAt": "2026-10-31T12:51:46.483Z",
+        "reason": "user chose Refine of incumbent Fraunces italic-accent identity (warm, editorial) in this session"
+      },
+      {
+        "rule": "overused-font",
+        "value": "*",
+        "files": [
+          "docs/index.html"
+        ],
+        "createdAt": "2026-10-31T12:51:46.502Z",
+        "reason": "user chose Refine; Fraunces is the incumbent display face"
+      },
+      {
+        "rule": "repeating-stripes-gradient",
+        "value": "*",
+        "files": [
+          "docs/index.html"
+        ],
+        "createdAt": "2026-10-31T12:51:46.521Z",
+        "reason": "incumbent scanline overlay; user picked 'The Signal Booth' north star"
+      },
+      {
+        "rule": "tight-leading",
+        "value": "*",
+        "files": [
+          "docs/index.html"
+        ],
+        "createdAt": "2026-10-31T12:53:41.806Z",
+        "reason": "agent triage: flagged elements are Fraunces headings at 1.2 line-height (display leading); body text is 1.55-1.7"
+      },
+      {
+        "rule": "clipped-overflow-container",
+        "value": "*",
+        "files": [
+          "docs/index.html"
+        ],
+        "createdAt": "2026-10-31T12:53:41.823Z",
+        "reason": "agent triage: body overflow-x:hidden propagates to the viewport, so the positioned skip link is not clipped"
+      }
+    ]
+  }
+}
