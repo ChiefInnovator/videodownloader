@@ -409,6 +409,7 @@
     text-decoration: none;
   }
   .skip-link:focus { top: 12px; }
+  main:focus { outline: none; }
 
   .container {
     max-width: 1180px;
@@ -964,7 +965,7 @@
 </head>
 <body>
 
-<a class="skip-link" href="#features">Skip to content</a>
+<a class="skip-link" href="#top">Skip to content</a>
 <nav>
   <div class="container nav-inner">
     <a class="logo" href="#top" aria-label="Video Downloader">
@@ -981,7 +982,7 @@
   </div>
 </nav>
 
-<main id="top">
+<main id="top" tabindex="-1">
 
   <!-- HERO -->
   <section class="hero">
@@ -1004,6 +1005,7 @@
           </div>
           <ul class="hero-meta">
             <li>Free &amp; no account</li>
+            <li>Works on most video sites</li>
             <li>No tracking</li>
             <li>Webinars &amp; training</li>
             <li>Slides too</li>
