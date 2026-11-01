@@ -21,7 +21,7 @@ Video Downloader is a free Chrome (Manifest V3) extension that finds the videos 
 
 ## Positioning
 
-- **Embedded work players.** Resolves cross-origin embeds (Vimeo, Wistia, Panopto, Vidyard, JW Player, Mux, Cloudflare Stream, Brightcove, ON24, Microsoft Medius) through each platform's own player API from inside the embed frame, forwarding the user's session cookies and JWT tokens — so "if you're signed in and can watch it, it can usually save it."
+- **Embedded work players.** Resolves cross-origin embeds from inside the embed frame, forwarding the user's session cookies and JWT tokens — so "if you're signed in and can watch it, it can usually save it." Vimeo, Wistia, JW Player, Mux, Cloudflare Stream, Vidyard, and Panopto resolve through each platform's own player API (`src/utils/platform-resolvers.js`); other embeds such as Brightcove, ON24, and Microsoft Medius fall back to manifests captured from network traffic, then to parsing the embed page's HTML.
 - **Zero telemetry.** No account, ads, analytics, or developer-owned server. Nothing leaves the browser except the fetches needed for the selected download. This is the product's core promise.
 
 ## Operating Context
