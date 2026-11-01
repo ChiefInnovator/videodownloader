@@ -124,7 +124,7 @@ One warm accent on warm darkness, with a cool signal for status.
 - **Hairline / Hairline Strong** (8% / 16% Bone): Section dividers, ledger rules, panel borders.
 
 ### Named Rules
-**The Ember Means Action Rule.** Ember (#ff6a1a) is reserved for things that act or advance: primary buttons, live capture data (the segment meter), sequence numerals, and disclosure toggles. Never use it for decoration, large fills, or backgrounds behind text. Everything else is ink, bone, or hairline.
+**The Ember Means Action Rule.** Ember (#ff6a1a) is reserved for things that act or advance: primary buttons, live capture data (the segment meter), sequence numerals, and disclosure toggles. Only primary buttons may use Ember behind text. Never use it for decoration or large fills. Everything else is ink, bone, or hairline.
 
 **The Signal Is Status Rule.** Teal means "working / found / OK". Never use it for decoration or emphasis.
 
@@ -198,7 +198,7 @@ A schematic of the extension popup mid-download, not a screenshot. Mono header (
 - **Do** use hairline ledgers (1px, 16% Bone) to structure feature lists instead of boxed cards.
 - **Do** give each headline exactly one italic Ember Light accent word or phrase.
 - **Do** keep text at Bone Faint (#8a8072) or brighter on Ink.
-- **Do** theme browser surfaces: Ember selection, ink scrollbars, Ember Light focus outlines.
+- **Do** theme browser surfaces: Bone selection with Ink text, ink scrollbars, Ember Light focus outlines.
 
 ### Don't:
 - **Don't** add glows or colored shadows to buttons, logos, dots, or avatars (The No Halo Rule).
