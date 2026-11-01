@@ -47,6 +47,24 @@
         ],
         "createdAt": "2026-10-31T12:53:41.823Z",
         "reason": "agent triage: body overflow-x:hidden propagates to the viewport, so the positioned skip link is not clipped"
+      },
+      {
+        "rule": "all-caps-body",
+        "value": "*",
+        "files": [
+          "docs/index.html"
+        ],
+        "createdAt": "2026-11-01T13:11:01.600Z",
+        "reason": "Agent: DESIGN.md:144 specifies uppercase hero metadata and booth labels; this is a short compatibility label, not body prose."
+      },
+      {
+        "rule": "cramped-padding",
+        "value": "*",
+        "files": [
+          "docs/index.html"
+        ],
+        "createdAt": "2026-11-01T13:11:01.622Z",
+        "reason": "Agent: .step has 28px vertical padding; .step:first-child removes both top padding and top border; .steps-row overrides first-child with 28px top padding. Cascade makes the flagged flush bordered row nonexistent."
       }
     ]
   }
