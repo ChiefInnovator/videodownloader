@@ -27,6 +27,7 @@ import {
 } from '../utils/fetch-strategy.js';
 import { muxFragmentedMp4 } from '../utils/mp4-mux.js';
 import { resolveFromPlatformApi } from '../utils/platform-resolvers.js';
+import { collectPageContext, pickPageTitle } from '../utils/page-context.js';
 
 // ── Network-level video detection ───────────────────────────────────
 
@@ -43,6 +44,21 @@ const networkVideos = new Map();
  * @type {Map<number, Map<string, { contentType: string, frameId: number, streamType: 'hls'|'dash' }>>}
  */
 const networkManifests = new Map();
+const pendingTitles = new Set();
+
+// Capture once per URL, while its player is still open. Never apply a later
+// session's title to previously detected requests.
+async function captureVideoTitle(tabId, video) {
+  try {
+    const results = await chrome.scripting.executeScript({
+      target: { tabId, allFrames: true },
+      func: collectPageContext,
+    });
+    const frames = results.filter(r => r.result)
+      .map(r => ({ ...r.result, frameId: r.frameId }));
+    video.title = pickPageTitle(frames.filter(f => f.isTop || f.frameId === video.frameId));
+  } catch { /* restricted frame: keep the URL-derived name */ }
+}
 
 const VIDEO_CONTENT_TYPES = [
   'video/', 'application/vnd.apple.mpegurl', 'application/x-mpegurl',
@@ -85,7 +101,7 @@ function streamTypeOf(url, contentType = '') {
  * cross-origin iframes (e.g. an ON24 player) carry the top tab's tabId,
  * so they land in the same per-tab maps as the page's own requests.
  */
-function recordNetworkVideo(details, contentType = '', contentLength = null) {
+function recordNetworkVideo(details, contentType = '', contentLength = null, captureTitle = true) {
   if (details.tabId < 0) return;
 
   const isVideoMime = VIDEO_CONTENT_TYPES.some(t =>
@@ -136,7 +152,13 @@ function recordNetworkVideo(details, contentType = '', contentLength = null) {
       duration: null,
       poster: null,
       title: '',
+      titleCaptured: true,
     });
+    if (captureTitle) {
+      const pending = captureVideoTitle(details.tabId, tabMap.get(details.url));
+      pendingTitles.add(pending);
+      pending.finally(() => pendingTitles.delete(pending));
+    }
   } else {
     // Fill in what onBeforeRequest could not know
     if (!existing.mime && contentType) existing.mime = contentType.split(';')[0].trim();
@@ -663,6 +685,7 @@ async function handleMessage(msg, _sender) {
     // ── Existing actions ──
 
     case 'getNetworkVideos': {
+      await Promise.all([...pendingTitles]);
       const tabId = msg.tabId;
       const map = networkVideos.get(tabId);
       return { videos: map ? Array.from(map.values()) : [] };
@@ -672,7 +695,7 @@ async function handleMessage(msg, _sender) {
       // Manifests the popup found in the page's Resource Timing — recovers
       // streams requested before this worker started (or restarted).
       for (const m of msg.manifests || []) {
-        recordNetworkVideo({ tabId: msg.tabId, frameId: m.frameId, url: m.url });
+        recordNetworkVideo({ tabId: msg.tabId, frameId: m.frameId, url: m.url }, '', null, false);
       }
       const map = networkVideos.get(msg.tabId);
       return { videos: map ? Array.from(map.values()) : [] };

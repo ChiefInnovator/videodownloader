@@ -6,6 +6,72 @@ const origin = 'https://player.example';
 const master = `${origin}/master.m3u8?token=master`;
 const media = `${origin}/only.m3u8?sig=variant`;
 const playlist = '#EXTM3U\n#EXT-X-TARGETDURATION:1\n#EXTINF:1,\na.ts?sig=a\n#EXTINF:1,\nb.ts?sig=b\n#EXT-X-ENDLIST\n';
+
+test('successive sessions retain their own titles across popup reopening and duplicate requests', async () => {
+  const h = await harness();
+  h.chrome.scripting.executeScript = async () => [{ frameId: 0,
+    result: { isTop: true, dialogTitle: 'First session' } }];
+  const first = `${origin}/first.mpd`;
+  h.record(first, 12);
+  await h.dispatch({ action: 'getNetworkVideos', tabId: 7 });
+  h.chrome.scripting.executeScript = async () => [{ frameId: 0,
+    result: { isTop: true, dialogTitle: 'Second session' } }];
+  h.record(`${origin}/second.mpd`, 12);
+  h.record(first, 12);
+  const videos = (await h.dispatch({ action: 'getNetworkVideos', tabId: 7 })).videos;
+  assert.deepEqual(Array.from(videos, v => v.title), ['First session', 'Second session']);
+  const popup = await h.popup();
+  h.chrome.runtime.sendMessage = msg => h.dispatch(msg);
+  // A fresh DOM scan may associate an old URL with the new document title.
+  h.chrome.tabs.sendMessage = async () => ({ videos: [{ url: first, title: 'Second session' }] });
+  await popup.loadVideos();
+  const cards = h.document.getElementById('video-list').children;
+  assert.match(cards[0].innerHTML, /First session/);
+  assert.match(cards[1].innerHTML, /Second session/);
+});
+
+test('recovered historical manifests never inherit the current session title', async () => {
+  const h = await harness();
+  const old = `${origin}/old-session.mpd`;
+  await h.dispatch({ action: 'registerManifests', tabId: 7, manifests: [{ url: old, frameId: 12 }] });
+  h.chrome.scripting.executeScript = async () => [{ frameId: 0,
+    result: { isTop: true, dialogTitle: 'Current session', manifests: [] } }];
+  h.chrome.runtime.sendMessage = msg => h.dispatch(msg);
+  const popup = await h.popup();
+  await popup.loadVideos();
+  const card = h.document.getElementById('video-list').children[0];
+  assert.match(card.innerHTML, /old-session/);
+  assert.doesNotMatch(card.innerHTML, /Current session/);
+});
+
+test('network title capture uses the requesting player instead of a sibling frame', async () => {
+  const h = await harness();
+  h.chrome.scripting.executeScript = async () => [
+    { frameId: 0, result: { isTop: true, docTitle: 'Host page' } },
+    { frameId: 11, result: { isTop: false, hasVideo: true, docTitle: 'Sibling video' } },
+    { frameId: 12, result: { isTop: false, hasVideo: true, docTitle: 'Requested video' } },
+  ];
+  h.record(`${origin}/requested.mpd`, 12);
+  const { videos } = await h.dispatch({ action: 'getNetworkVideos', tabId: 7 });
+  assert.equal(videos[0].title, 'Requested video');
+});
+
+test('failed network title capture falls back to its URL instead of a later page title', async () => {
+  const h = await harness();
+  h.chrome.scripting.executeScript = async () => { throw new Error('Restricted frame'); };
+  h.record(`${origin}/original-video.mpd`, 12);
+  const { videos } = await h.dispatch({ action: 'getNetworkVideos', tabId: 7 });
+  assert.equal(videos[0].title, '');
+  h.chrome.scripting.executeScript = async () => [{ frameId: 0,
+    result: { isTop: true, dialogTitle: 'Later session', manifests: [] } }];
+  h.chrome.runtime.sendMessage = msg => h.dispatch(msg);
+  const popup = await h.popup();
+  await popup.loadVideos();
+  const card = h.document.getElementById('video-list').children[0];
+  assert.match(card.innerHTML, /original-video/);
+  assert.doesNotMatch(card.innerHTML, /Later session/);
+});
+
 function hls(h) {
   h.routes.set(master, '#EXTM3U\n#EXT-X-STREAM-INF:BANDWIDTH=100000,RESOLUTION=320x180\nonly.m3u8?sig=variant\n');
   h.routes.set(media, playlist);

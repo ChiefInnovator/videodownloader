@@ -37,7 +37,7 @@ The current release is v2.4.3 (published 2026-11-02). It is distributed as a Chr
 - **Resilient downloads** — segments retry with exponential backoff; one that stays unavailable is skipped and reported instead of failing the whole download. Anvato and Uplynk ad segments are dropped.
 - **Player‑config detection** — finds media in JW Player, Video.js, and Flowplayer setup code, Next.js and Nuxt page data, `<mux-player>` elements, JSON‑LD `embedUrl`, and `twitter:player:stream` cards.
 - **Audio only and copy link** — DASH streams with a separate audio track offer an "Audio only (.m4a)" choice (the original AAC track, no re‑encoding). Every detected video has a **Copy link** button for pasting its direct or manifest URL into a player such as VLC.
-- **Session‑titled files and slides** — downloads are named after the session or player title, and linked slide decks (PDF, PPT, Key) are listed and saved alongside the video.
+- **Session‑titled files and slides** — each network video's session/player title is captured when detected, so later playback on the same page keeps earlier names intact. Historical streams without a captured title use their URL filename. Linked slide decks (PDF, PPT, Key) are listed and saved alongside the video.
 - **Authentication forwarding** — extracts JWT tokens from iframe URL query parameters and pulls session cookies via `chrome.cookies.getAll()`. Applied to all manifest, segment, and key requests.
 - **DRM detection** — surfaces Widevine, PlayReady, FairPlay (`skd://`), and Adobe Access markers in manifests and clearly warns the user. Does not attempt to bypass DRM.
 - **Segment‑level progress** — live readout of segment count, percent complete, throughput, and ETA. Pause, resume, and cancel at any time.
