@@ -105,11 +105,13 @@ async function loadVideos() {
   // Deduplicate direct videos by URL.
   const seen = new Set();
   const directVideos = [];
+  const capturedTitles = new Map(networkVideos.filter(v => v.titleCaptured).map(v => [v.url, v.title]));
   for (const v of [...contentVideos, ...networkVideos]) {
     if (seen.has(v.url)) continue;
     if (SUB_RE.test(v.url)) continue; // skip sub-resources
     seen.add(v.url);
-    directVideos.push(v);
+    directVideos.push(capturedTitles.has(v.url)
+      ? { ...v, title: capturedTitles.get(v.url), titleCaptured: true } : v);
   }
 
   // Deduplicate iframes
@@ -163,8 +165,8 @@ function isStreamVideo(video) {
 }
 
 /**
- * Give every card a distinct name: its own title, else the session title
- * (main stream first), else a meaningful URL filename; repeats get " (2)".
+ * Keep captured titles tied to their URL. Unnamed historical requests use
+ * their URL filename rather than the currently open session's title.
  */
 function assignNames(videos) {
   const seen = new Map();
@@ -172,9 +174,9 @@ function assignNames(videos) {
     const ext = extFromUrl(video.url) || extFromMime(video.mime) || 'mp4';
     const urlName = filenameFromUrl(video.url, ext);
     let base = video.title;
-    if (!base && isStreamVideo(video)) base = pageContext.title;
+    if (!base && !video.titleCaptured && isStreamVideo(video)) base = pageContext.title;
     if (!base && !isGenericName(urlName)) base = urlName.replace(/\.\w{2,5}$/, '');
-    if (!base) base = pageContext.title || 'video';
+    if (!base) base = video.titleCaptured ? urlName.replace(/\.\w{2,5}$/, '') || 'video' : pageContext.title || 'video';
     const count = (seen.get(base) || 0) + 1;
     seen.set(base, count);
     video._name = count > 1 ? `${base} (${count})` : base;

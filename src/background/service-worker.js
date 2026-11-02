@@ -27,6 +27,7 @@ import {
 } from '../utils/fetch-strategy.js';
 import { muxFragmentedMp4 } from '../utils/mp4-mux.js';
 import { resolveFromPlatformApi } from '../utils/platform-resolvers.js';
+import { collectPageContext, pickPageTitle } from '../utils/page-context.js';
 
 // ── Network-level video detection ───────────────────────────────────
 
@@ -43,6 +44,52 @@ const networkVideos = new Map();
  * @type {Map<number, Map<string, { contentType: string, frameId: number, streamType: 'hls'|'dash' }>>}
  */
 const networkManifests = new Map();
+const pendingTitles = new Map();
+
+async function videosWithCapturedTitles(tabId) {
+  // Requests can arrive while an earlier capture is pending. Drain this tab's
+  // captures before returning its map, including those added during the wait.
+  while (pendingTitles.get(tabId)?.size) {
+    await Promise.all([...pendingTitles.get(tabId)].map(capture => capture.promise));
+  }
+  const map = networkVideos.get(tabId);
+  return { videos: map ? Array.from(map.values()) : [] };
+}
+
+// Capture once per URL, while its player is still open. Never apply a later
+// session's title to previously detected requests.
+function captureVideoTitle(tabId, video) {
+  let finish;
+  let active = true;
+  const promise = new Promise(resolve => { finish = resolve; });
+  const timer = setTimeout(cancel, 2000);
+  function cancel() {
+    if (!active) return;
+    active = false;
+    clearTimeout(timer);
+    finish();
+  }
+  (async () => {
+    try {
+      const results = await chrome.scripting.executeScript({
+        target: { tabId, allFrames: true },
+        func: collectPageContext,
+      });
+      const frames = results.filter(r => r.result)
+        .map(r => ({ ...r.result, frameId: r.frameId }));
+      if (active && networkVideos.get(tabId)?.get(video.url) === video) {
+        video.title = pickPageTitle(frames.filter(f => f.isTop || f.frameId === video.frameId));
+      }
+    } catch { /* restricted frame: keep the URL-derived name */ }
+    finally { cancel(); }
+  })();
+  return { promise, cancel };
+}
+
+function clearTitleCaptures(tabId) {
+  for (const capture of pendingTitles.get(tabId) || []) capture.cancel();
+  pendingTitles.delete(tabId);
+}
 
 const VIDEO_CONTENT_TYPES = [
   'video/', 'application/vnd.apple.mpegurl', 'application/x-mpegurl',
@@ -85,7 +132,7 @@ function streamTypeOf(url, contentType = '') {
  * cross-origin iframes (e.g. an ON24 player) carry the top tab's tabId,
  * so they land in the same per-tab maps as the page's own requests.
  */
-function recordNetworkVideo(details, contentType = '', contentLength = null) {
+function recordNetworkVideo(details, contentType = '', contentLength = null, captureTitle = true) {
   if (details.tabId < 0) return;
 
   const isVideoMime = VIDEO_CONTENT_TYPES.some(t =>
@@ -136,7 +183,18 @@ function recordNetworkVideo(details, contentType = '', contentLength = null) {
       duration: null,
       poster: null,
       title: '',
+      titleCaptured: true,
     });
+    if (captureTitle) {
+      const pending = captureVideoTitle(details.tabId, tabMap.get(details.url));
+      if (!pendingTitles.has(details.tabId)) pendingTitles.set(details.tabId, new Set());
+      const captures = pendingTitles.get(details.tabId);
+      captures.add(pending);
+      pending.promise.finally(() => {
+        captures.delete(pending);
+        if (!captures.size && pendingTitles.get(details.tabId) === captures) pendingTitles.delete(details.tabId);
+      });
+    }
   } else {
     // Fill in what onBeforeRequest could not know
     if (!existing.mime && contentType) existing.mime = contentType.split(';')[0].trim();
@@ -202,6 +260,7 @@ async function framesForDocument(tabId, url) {
 
 // Clean up when a tab closes.
 chrome.tabs.onRemoved.addListener((tabId) => {
+  clearTitleCaptures(tabId);
   networkVideos.delete(tabId);
   networkManifests.delete(tabId);
 });
@@ -209,6 +268,7 @@ chrome.tabs.onRemoved.addListener((tabId) => {
 // Reset on navigation.
 chrome.webNavigation?.onCommitted?.addListener((details) => {
   if (details.frameId === 0) {
+    clearTitleCaptures(details.tabId);
     networkVideos.delete(details.tabId);
     networkManifests.delete(details.tabId);
     updateBadge(details.tabId);
@@ -663,19 +723,16 @@ async function handleMessage(msg, _sender) {
     // ── Existing actions ──
 
     case 'getNetworkVideos': {
-      const tabId = msg.tabId;
-      const map = networkVideos.get(tabId);
-      return { videos: map ? Array.from(map.values()) : [] };
+      return videosWithCapturedTitles(msg.tabId);
     }
 
     case 'registerManifests': {
       // Manifests the popup found in the page's Resource Timing — recovers
       // streams requested before this worker started (or restarted).
       for (const m of msg.manifests || []) {
-        recordNetworkVideo({ tabId: msg.tabId, frameId: m.frameId, url: m.url });
+        recordNetworkVideo({ tabId: msg.tabId, frameId: m.frameId, url: m.url }, '', null, false);
       }
-      const map = networkVideos.get(msg.tabId);
-      return { videos: map ? Array.from(map.values()) : [] };
+      return videosWithCapturedTitles(msg.tabId);
     }
 
     case 'download': {
