@@ -236,7 +236,7 @@
       "kind": "button",
       "refersTo": "button-primary",
       "description": "The one primary action: Download.",
-      "html": "<a class=\"ds-btn-primary\" href=\"#\"><svg width=\"17\" height=\"17\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><path d=\"M12 4v11m0 0l-4.5-4.5M12 15l4.5-4.5M5 20h14\"/></svg>Download v2.4.2</a>",
+      "html": "<a class=\"ds-btn-primary\" href=\"#\"><svg width=\"17\" height=\"17\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><path d=\"M12 4v11m0 0l-4.5-4.5M12 15l4.5-4.5M5 20h14\"/></svg>Download v2.4.3</a>",
       "css": ":host{--ink:#0b0907;--ink-2:#120f0c;--ink-3:#1a1613;--bone:#f2ece3;--bone-dim:#c9bfb0;--bone-faint:#8a8072;--ember:#ff6a1a;--ember-2:#ffb347;--signal:#5ae2c6;--line:rgba(242,236,227,.08);--line-strong:rgba(242,236,227,.16);}.ds-btn-primary{display:inline-flex;align-items:center;gap:10px;padding:14px 26px;border-radius:8px;background:var(--ember);color:var(--ink);font:600 15px Figtree,system-ui,sans-serif;text-decoration:none;box-shadow:0 10px 24px -14px rgba(0,0,0,.9);transition:transform .2s cubic-bezier(.16,1,.3,1),background .2s}.ds-btn-primary:hover{background:var(--ember-2);transform:translateY(-1px)}.ds-btn-primary:focus-visible{outline:2px solid var(--ember-2);outline-offset:3px}"
     },
     {
