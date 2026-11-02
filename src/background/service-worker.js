@@ -44,7 +44,17 @@ const networkVideos = new Map();
  * @type {Map<number, Map<string, { contentType: string, frameId: number, streamType: 'hls'|'dash' }>>}
  */
 const networkManifests = new Map();
-const pendingTitles = new Set();
+const pendingTitles = new Map();
+
+async function videosWithCapturedTitles(tabId) {
+  // Requests can arrive while an earlier capture is pending. Drain this tab's
+  // captures before returning its map, including those added during the wait.
+  while (pendingTitles.get(tabId)?.size) {
+    await Promise.all([...pendingTitles.get(tabId)]);
+  }
+  const map = networkVideos.get(tabId);
+  return { videos: map ? Array.from(map.values()) : [] };
+}
 
 // Capture once per URL, while its player is still open. Never apply a later
 // session's title to previously detected requests.
@@ -156,8 +166,13 @@ function recordNetworkVideo(details, contentType = '', contentLength = null, cap
     });
     if (captureTitle) {
       const pending = captureVideoTitle(details.tabId, tabMap.get(details.url));
-      pendingTitles.add(pending);
-      pending.finally(() => pendingTitles.delete(pending));
+      if (!pendingTitles.has(details.tabId)) pendingTitles.set(details.tabId, new Set());
+      const captures = pendingTitles.get(details.tabId);
+      captures.add(pending);
+      pending.finally(() => {
+        captures.delete(pending);
+        if (!captures.size) pendingTitles.delete(details.tabId);
+      });
     }
   } else {
     // Fill in what onBeforeRequest could not know
@@ -685,10 +700,7 @@ async function handleMessage(msg, _sender) {
     // ── Existing actions ──
 
     case 'getNetworkVideos': {
-      await Promise.all([...pendingTitles]);
-      const tabId = msg.tabId;
-      const map = networkVideos.get(tabId);
-      return { videos: map ? Array.from(map.values()) : [] };
+      return videosWithCapturedTitles(msg.tabId);
     }
 
     case 'registerManifests': {
@@ -697,8 +709,7 @@ async function handleMessage(msg, _sender) {
       for (const m of msg.manifests || []) {
         recordNetworkVideo({ tabId: msg.tabId, frameId: m.frameId, url: m.url }, '', null, false);
       }
-      const map = networkVideos.get(msg.tabId);
-      return { videos: map ? Array.from(map.values()) : [] };
+      return videosWithCapturedTitles(msg.tabId);
     }
 
     case 'download': {

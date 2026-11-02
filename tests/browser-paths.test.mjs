@@ -83,6 +83,50 @@ function hls(h) {
   return packets;
 }
 
+for (const action of ['getNetworkVideos', 'registerManifests']) {
+  test(`${action} waits for title captures added while an earlier capture is pending`, async () => {
+    const h = await harness();
+    const captures = [];
+    h.chrome.scripting.executeScript = () => new Promise(resolve => captures.push(resolve));
+    h.record(`${origin}/first.mpd`, 12);
+    let returned = false;
+    const response = h.dispatch({ action, tabId: 7, manifests: [] }).then(value => {
+      returned = true;
+      return value;
+    });
+    h.record(`${origin}/second.mpd`, 12);
+    captures[0]([{ frameId: 0, result: { isTop: true, dialogTitle: 'First session' } }]);
+    await new Promise(resolve => setImmediate(resolve));
+    assert.equal(returned, false, 'second capture must finish before returning the video list');
+    captures[1]([{ frameId: 0, result: { isTop: true, dialogTitle: 'Second session' } }]);
+    const { videos } = await response;
+    assert.deepEqual(Array.from(videos, v => v.title), ['First session', 'Second session']);
+  });
+
+  test(`${action} does not wait for another tab's pending title capture`, async () => {
+    const h = await harness();
+    let finishOtherTab;
+    h.chrome.scripting.executeScript = ({ target }) => target.tabId === 8
+      ? new Promise(resolve => { finishOtherTab = resolve; })
+      : Promise.resolve([{ frameId: 0, result: { isTop: true, dialogTitle: 'Requested tab' } }]);
+    h.chrome.webRequest.onBeforeRequest.listeners[0]({ tabId: 8,
+      url: `${origin}/other-tab.mpd`, frameId: 12 });
+    h.record(`${origin}/requested-tab.mpd`, 12);
+    let returned = false;
+    const response = h.dispatch({ action, tabId: 7, manifests: [] }).then(value => {
+      returned = true;
+      return value;
+    });
+    await new Promise(resolve => setImmediate(resolve));
+    const returnedBeforeOtherTab = returned;
+    finishOtherTab([]);
+    const { videos } = await response;
+    assert.equal(returnedBeforeOtherTab, true, 'another tab must not delay this tab');
+    assert.equal(videos.length, 1);
+    assert.equal(videos[0].title, 'Requested tab');
+  });
+}
+
 test('popup single-quality path downloads segment bytes through worker and offscreen handoff', async () => {
   const h = await harness();
   const packets = hls(h);
