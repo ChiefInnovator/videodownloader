@@ -6,6 +6,72 @@ const origin = 'https://player.example';
 const master = `${origin}/master.m3u8?token=master`;
 const media = `${origin}/only.m3u8?sig=variant`;
 const playlist = '#EXTM3U\n#EXT-X-TARGETDURATION:1\n#EXTINF:1,\na.ts?sig=a\n#EXTINF:1,\nb.ts?sig=b\n#EXT-X-ENDLIST\n';
+
+test('successive sessions retain their own titles across popup reopening and duplicate requests', async () => {
+  const h = await harness();
+  h.chrome.scripting.executeScript = async () => [{ frameId: 0,
+    result: { isTop: true, dialogTitle: 'First session' } }];
+  const first = `${origin}/first.mpd`;
+  h.record(first, 12);
+  await h.dispatch({ action: 'getNetworkVideos', tabId: 7 });
+  h.chrome.scripting.executeScript = async () => [{ frameId: 0,
+    result: { isTop: true, dialogTitle: 'Second session' } }];
+  h.record(`${origin}/second.mpd`, 12);
+  h.record(first, 12);
+  const videos = (await h.dispatch({ action: 'getNetworkVideos', tabId: 7 })).videos;
+  assert.deepEqual(Array.from(videos, v => v.title), ['First session', 'Second session']);
+  const popup = await h.popup();
+  h.chrome.runtime.sendMessage = msg => h.dispatch(msg);
+  // A fresh DOM scan may associate an old URL with the new document title.
+  h.chrome.tabs.sendMessage = async () => ({ videos: [{ url: first, title: 'Second session' }] });
+  await popup.loadVideos();
+  const cards = h.document.getElementById('video-list').children;
+  assert.match(cards[0].innerHTML, /First session/);
+  assert.match(cards[1].innerHTML, /Second session/);
+});
+
+test('recovered historical manifests never inherit the current session title', async () => {
+  const h = await harness();
+  const old = `${origin}/old-session.mpd`;
+  await h.dispatch({ action: 'registerManifests', tabId: 7, manifests: [{ url: old, frameId: 12 }] });
+  h.chrome.scripting.executeScript = async () => [{ frameId: 0,
+    result: { isTop: true, dialogTitle: 'Current session', manifests: [] } }];
+  h.chrome.runtime.sendMessage = msg => h.dispatch(msg);
+  const popup = await h.popup();
+  await popup.loadVideos();
+  const card = h.document.getElementById('video-list').children[0];
+  assert.match(card.innerHTML, /old-session/);
+  assert.doesNotMatch(card.innerHTML, /Current session/);
+});
+
+test('network title capture uses the requesting player instead of a sibling frame', async () => {
+  const h = await harness();
+  h.chrome.scripting.executeScript = async () => [
+    { frameId: 0, result: { isTop: true, docTitle: 'Host page' } },
+    { frameId: 11, result: { isTop: false, hasVideo: true, docTitle: 'Sibling video' } },
+    { frameId: 12, result: { isTop: false, hasVideo: true, docTitle: 'Requested video' } },
+  ];
+  h.record(`${origin}/requested.mpd`, 12);
+  const { videos } = await h.dispatch({ action: 'getNetworkVideos', tabId: 7 });
+  assert.equal(videos[0].title, 'Requested video');
+});
+
+test('failed network title capture falls back to its URL instead of a later page title', async () => {
+  const h = await harness();
+  h.chrome.scripting.executeScript = async () => { throw new Error('Restricted frame'); };
+  h.record(`${origin}/original-video.mpd`, 12);
+  const { videos } = await h.dispatch({ action: 'getNetworkVideos', tabId: 7 });
+  assert.equal(videos[0].title, '');
+  h.chrome.scripting.executeScript = async () => [{ frameId: 0,
+    result: { isTop: true, dialogTitle: 'Later session', manifests: [] } }];
+  h.chrome.runtime.sendMessage = msg => h.dispatch(msg);
+  const popup = await h.popup();
+  await popup.loadVideos();
+  const card = h.document.getElementById('video-list').children[0];
+  assert.match(card.innerHTML, /original-video/);
+  assert.doesNotMatch(card.innerHTML, /Later session/);
+});
+
 function hls(h) {
   h.routes.set(master, '#EXTM3U\n#EXT-X-STREAM-INF:BANDWIDTH=100000,RESOLUTION=320x180\nonly.m3u8?sig=variant\n');
   h.routes.set(media, playlist);
@@ -16,6 +82,105 @@ function hls(h) {
   h.record(master, 12);
   return packets;
 }
+
+for (const action of ['getNetworkVideos', 'registerManifests']) {
+  test(`${action} waits for title captures added while an earlier capture is pending`, async () => {
+    const h = await harness();
+    const captures = [];
+    h.chrome.scripting.executeScript = () => new Promise(resolve => captures.push(resolve));
+    h.record(`${origin}/first.mpd`, 12);
+    let returned = false;
+    const response = h.dispatch({ action, tabId: 7, manifests: [] }).then(value => {
+      returned = true;
+      return value;
+    });
+    h.record(`${origin}/second.mpd`, 12);
+    captures[0]([{ frameId: 0, result: { isTop: true, dialogTitle: 'First session' } }]);
+    await new Promise(resolve => setImmediate(resolve));
+    assert.equal(returned, false, 'second capture must finish before returning the video list');
+    captures[1]([{ frameId: 0, result: { isTop: true, dialogTitle: 'Second session' } }]);
+    const { videos } = await response;
+    assert.deepEqual(Array.from(videos, v => v.title), ['First session', 'Second session']);
+  });
+
+  test(`${action} does not wait for another tab's pending title capture`, async () => {
+    const h = await harness();
+    let finishOtherTab;
+    h.chrome.scripting.executeScript = ({ target }) => target.tabId === 8
+      ? new Promise(resolve => { finishOtherTab = resolve; })
+      : Promise.resolve([{ frameId: 0, result: { isTop: true, dialogTitle: 'Requested tab' } }]);
+    h.chrome.webRequest.onBeforeRequest.listeners[0]({ tabId: 8,
+      url: `${origin}/other-tab.mpd`, frameId: 12 });
+    h.record(`${origin}/requested-tab.mpd`, 12);
+    let returned = false;
+    const response = h.dispatch({ action, tabId: 7, manifests: [] }).then(value => {
+      returned = true;
+      return value;
+    });
+    await new Promise(resolve => setImmediate(resolve));
+    const returnedBeforeOtherTab = returned;
+    finishOtherTab([]);
+    const { videos } = await response;
+    assert.equal(returnedBeforeOtherTab, true, 'another tab must not delay this tab');
+    assert.equal(videos.length, 1);
+    assert.equal(videos[0].title, 'Requested tab');
+  });
+}
+
+for (const reset of ['navigation', 'tab removal']) {
+  test(`${reset} releases stale captures without clearing the next page's captures`, async () => {
+    const h = await harness();
+    const captures = [];
+    h.chrome.scripting.executeScript = () => new Promise(resolve => captures.push(resolve));
+    const resetTab = () => reset === 'navigation'
+      ? h.chrome.webNavigation.onCommitted.listeners[0]({ tabId: 7, frameId: 0 })
+      : h.chrome.tabs.onRemoved.listeners[0](7);
+    const url = `${origin}/same-url.mpd`;
+    h.record(url, 12);
+    let oldReturned = false;
+    const oldResponse = h.dispatch({ action: 'getNetworkVideos', tabId: 7 }).then(value => {
+      oldReturned = true;
+      return value;
+    });
+    resetTab();
+    await new Promise(resolve => setImmediate(resolve));
+    assert.equal(oldReturned, true, 'reset must unblock a wait for an unresolved capture');
+    assert.equal((await oldResponse).videos.length, 0);
+
+    // Start a new capture immediately after cancelling another old capture,
+    // before the cancelled promise's cleanup microtask has run.
+    h.record(url, 12);
+    resetTab();
+    h.record(url, 12);
+    let newReturned = false;
+    const newResponse = h.dispatch({ action: 'getNetworkVideos', tabId: 7 }).then(value => {
+      newReturned = true;
+      return value;
+    });
+    captures[1]([{ frameId: 0, result: { isTop: true, dialogTitle: 'Stale session' } }]);
+    await new Promise(resolve => setImmediate(resolve));
+    assert.equal(newReturned, false, 'old cleanup must preserve the new page capture set');
+    captures[2]([{ frameId: 0, result: { isTop: true, dialogTitle: 'New session' } }]);
+    assert.equal((await newResponse).videos[0].title, 'New session');
+    captures[0]([{ frameId: 0, result: { isTop: true, dialogTitle: 'Even older session' } }]);
+    await new Promise(resolve => setImmediate(resolve));
+    const { videos } = await h.dispatch({ action: 'getNetworkVideos', tabId: 7 });
+    assert.equal(videos[0].title, 'New session');
+  });
+}
+
+test('title capture timeout releases the response and ignores late results', { timeout: 5000 }, async () => {
+  const h = await harness();
+  let finishCapture;
+  h.chrome.scripting.executeScript = () => new Promise(resolve => { finishCapture = resolve; });
+  h.record(`${origin}/slow-title.mpd`, 12);
+  const { videos } = await h.dispatch({ action: 'getNetworkVideos', tabId: 7 });
+  assert.equal(videos[0].title, '');
+  assert.equal(videos[0].titleCaptured, true);
+  finishCapture([{ frameId: 0, result: { isTop: true, dialogTitle: 'Late session' } }]);
+  await new Promise(resolve => setImmediate(resolve));
+  assert.equal((await h.dispatch({ action: 'getNetworkVideos', tabId: 7 })).videos[0].title, '');
+});
 
 test('popup single-quality path downloads segment bytes through worker and offscreen handoff', async () => {
   const h = await harness();

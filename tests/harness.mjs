@@ -37,6 +37,7 @@ export async function harness() {
     storage: { sync: { get: async defaults => defaults } },
     downloads: { onChanged: event(), search: async () => [], download(opts, cb) { downloads.push(opts); cb(downloads.length); } },
     scripting: { executeScript: async ({ func, args, target }) => {
+      if (func.name === 'collectPageContext') return [];
       requests.push({ target });
       return [{ result: await func(...args) }];
     } },
