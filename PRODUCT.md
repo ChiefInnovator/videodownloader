@@ -37,7 +37,7 @@ Video Downloader is a free Chrome (Manifest V3) extension that finds the videos 
 - DRM (Widevine, PlayReady, FairPlay, Adobe Access) is detected and refused — never circumvented.
 - Plain JavaScript ES modules, no build step, no npm dependencies; loadable as-is.
 - HLS streams may save as `.ts`; DASH and fMP4 HLS save as `.mp4`.
-- Version source of truth: `manifest.json` (currently 2.4.2).
+- Version source of truth: `manifest.json` (currently 2.4.3).
 
 ## Brand Commitments
 
