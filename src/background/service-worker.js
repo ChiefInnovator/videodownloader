@@ -50,7 +50,7 @@ async function videosWithCapturedTitles(tabId) {
   // Requests can arrive while an earlier capture is pending. Drain this tab's
   // captures before returning its map, including those added during the wait.
   while (pendingTitles.get(tabId)?.size) {
-    await Promise.all([...pendingTitles.get(tabId)]);
+    await Promise.all([...pendingTitles.get(tabId)].map(capture => capture.promise));
   }
   const map = networkVideos.get(tabId);
   return { videos: map ? Array.from(map.values()) : [] };
@@ -58,16 +58,37 @@ async function videosWithCapturedTitles(tabId) {
 
 // Capture once per URL, while its player is still open. Never apply a later
 // session's title to previously detected requests.
-async function captureVideoTitle(tabId, video) {
-  try {
-    const results = await chrome.scripting.executeScript({
-      target: { tabId, allFrames: true },
-      func: collectPageContext,
-    });
-    const frames = results.filter(r => r.result)
-      .map(r => ({ ...r.result, frameId: r.frameId }));
-    video.title = pickPageTitle(frames.filter(f => f.isTop || f.frameId === video.frameId));
-  } catch { /* restricted frame: keep the URL-derived name */ }
+function captureVideoTitle(tabId, video) {
+  let finish;
+  let active = true;
+  const promise = new Promise(resolve => { finish = resolve; });
+  const timer = setTimeout(cancel, 2000);
+  function cancel() {
+    if (!active) return;
+    active = false;
+    clearTimeout(timer);
+    finish();
+  }
+  (async () => {
+    try {
+      const results = await chrome.scripting.executeScript({
+        target: { tabId, allFrames: true },
+        func: collectPageContext,
+      });
+      const frames = results.filter(r => r.result)
+        .map(r => ({ ...r.result, frameId: r.frameId }));
+      if (active && networkVideos.get(tabId)?.get(video.url) === video) {
+        video.title = pickPageTitle(frames.filter(f => f.isTop || f.frameId === video.frameId));
+      }
+    } catch { /* restricted frame: keep the URL-derived name */ }
+    finally { cancel(); }
+  })();
+  return { promise, cancel };
+}
+
+function clearTitleCaptures(tabId) {
+  for (const capture of pendingTitles.get(tabId) || []) capture.cancel();
+  pendingTitles.delete(tabId);
 }
 
 const VIDEO_CONTENT_TYPES = [
@@ -169,9 +190,9 @@ function recordNetworkVideo(details, contentType = '', contentLength = null, cap
       if (!pendingTitles.has(details.tabId)) pendingTitles.set(details.tabId, new Set());
       const captures = pendingTitles.get(details.tabId);
       captures.add(pending);
-      pending.finally(() => {
+      pending.promise.finally(() => {
         captures.delete(pending);
-        if (!captures.size) pendingTitles.delete(details.tabId);
+        if (!captures.size && pendingTitles.get(details.tabId) === captures) pendingTitles.delete(details.tabId);
       });
     }
   } else {
@@ -239,6 +260,7 @@ async function framesForDocument(tabId, url) {
 
 // Clean up when a tab closes.
 chrome.tabs.onRemoved.addListener((tabId) => {
+  clearTitleCaptures(tabId);
   networkVideos.delete(tabId);
   networkManifests.delete(tabId);
 });
@@ -246,6 +268,7 @@ chrome.tabs.onRemoved.addListener((tabId) => {
 // Reset on navigation.
 chrome.webNavigation?.onCommitted?.addListener((details) => {
   if (details.frameId === 0) {
+    clearTitleCaptures(details.tabId);
     networkVideos.delete(details.tabId);
     networkManifests.delete(details.tabId);
     updateBadge(details.tabId);
