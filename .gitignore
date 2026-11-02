@@ -35,3 +35,7 @@ npm-debug.log*
 
 # Chrome extension packaging artifacts
 key.pem
+
+# Impeccable local state
+.impeccable/hook.cache.json
+.impeccable/config.local.json
