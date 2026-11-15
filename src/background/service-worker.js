@@ -27,6 +27,7 @@ import { muxFragmentedMp4 } from '../utils/mp4-mux.js';
 import { resolveFromPlatformApi } from '../utils/platform-resolvers.js';
 import { collectPageContext, pickPageTitle } from '../utils/page-context.js';
 import { isYouTubeUrl, isYouTubeMediaHost } from '../utils/youtube.js';
+import { checkForUpdate } from './update-check.js';
 import {
   companionSettings, probeCompanion, startCompanionDownload,
   cancelCompanionDownload, listCompanionJobs,
@@ -269,6 +270,11 @@ async function framesForDocument(tabId, url) {
 }
 
 // Clean up when a tab closes.
+// Update check: at most once a day, when the browser starts or the
+// extension is installed/updated (see update-check.js; off in Settings).
+chrome.runtime.onStartup?.addListener(() => { checkForUpdate().catch(() => {}); });
+chrome.runtime.onInstalled?.addListener(() => { checkForUpdate().catch(() => {}); });
+
 chrome.tabs.onRemoved.addListener((tabId) => {
   clearTitleCaptures(tabId);
   networkVideos.delete(tabId);
@@ -978,6 +984,17 @@ async function handleMessage(msg) {
 
     case 'getStreamJobState': {
       return { job: publicJob(getJobState(msg.jobId)) };
+    }
+
+    // ── Update indicator ──
+
+    case 'getUpdateStatus': {
+      // Uses the stored result; hits GitHub only when the last check is stale.
+      return checkForUpdate();
+    }
+
+    case 'checkForUpdateNow': {
+      return checkForUpdate({ force: true });
     }
 
     // ── YouTube via the optional companion app ──

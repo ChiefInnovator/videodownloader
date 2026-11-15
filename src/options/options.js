@@ -7,6 +7,7 @@ const DEFAULTS = {
   downloadPath: '',
   companionEnabled: false,
   ytCookiesFromBrowser: false,
+  checkForUpdates: true,
 };
 
 const ids = Object.keys(DEFAULTS);
@@ -92,9 +93,46 @@ function initCompanion() {
   document.getElementById('btn-test-companion').addEventListener('click', testCompanion);
 }
 
+// ── Updates ─────────────────────────────────────────────────────────
+
+function describeUpdate(status) {
+  if (!status) return '';
+  if (!status.enabled) return 'Update checks are off';
+  if (status.error) return `Couldn't check: ${status.error}`;
+  if (status.available) return `v${status.latest} is available (you have v${status.current})`;
+  return status.latest ? `Up to date (v${status.current})` : '';
+}
+
+async function refreshUpdateStatus(force) {
+  const el = document.getElementById('update-status');
+  if (force) el.textContent = 'Checking…';
+  const status = await chrome.runtime.sendMessage({ action: force ? 'checkForUpdateNow' : 'getUpdateStatus' })
+    .catch(err => ({ enabled: true, error: err.message }));
+  el.textContent = describeUpdate(status);
+  if (status?.available && status.url) {
+    const link = document.createElement('a');
+    link.href = status.url;
+    link.target = '_blank';
+    link.rel = 'noopener';
+    link.textContent = ' — get it';
+    el.append(link);
+  }
+}
+
+function initUpdates() {
+  document.getElementById('btn-check-update').addEventListener('click', async () => {
+    // Save the toggle first so "Check now" honours an unsaved change.
+    const on = document.getElementById('checkForUpdates').checked;
+    await chrome.storage.sync.set({ checkForUpdates: on });
+    refreshUpdateStatus(true);
+  });
+  refreshUpdateStatus(false);
+}
+
 document.addEventListener('DOMContentLoaded', () => {
   load();
   initCompanion();
+  initUpdates();
   const ver = document.getElementById('version');
   if (ver) ver.textContent = 'v' + chrome.runtime.getManifest().version;
 });

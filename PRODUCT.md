@@ -22,7 +22,7 @@ Video Downloader is a free Chrome (Manifest V3) extension that finds the videos 
 ## Positioning
 
 - **Embedded work players.** Resolves cross-origin embeds from inside the embed frame, using the user's own browser session and the embed's JWT tokens — so "if you're signed in and can watch it, it can usually save it." Vimeo, Wistia, JW Player, Mux, Cloudflare Stream, Vidyard, and Panopto resolve through each platform's own player API (`src/utils/platform-resolvers.js`); other embeds such as Brightcove, ON24, and Microsoft Medius fall back to manifests captured from network traffic, then to parsing the embed page's HTML.
-- **Zero telemetry.** No account, ads, analytics, or developer-owned server. Nothing leaves the browser except the fetches needed for the selected download. This is the product's core promise.
+- **Zero telemetry.** No account, ads, analytics, or developer-owned server. Nothing leaves the browser except the fetches needed for the selected download, and a once-a-day, cookie-less check of GitHub's latest release number for the update indicator (can be turned off). This is the product's core promise.
 
 ## Operating Context
 
@@ -37,7 +37,7 @@ Video Downloader is a free Chrome (Manifest V3) extension that finds the videos 
 - DRM (Widevine, PlayReady, FairPlay, Adobe Access) is detected and refused — never circumvented.
 - Plain JavaScript ES modules, no build step, no npm dependencies; loadable as-is.
 - HLS streams may save as `.ts`; DASH and fMP4 HLS save as `.mp4`.
-- Version source of truth: `manifest.json` (currently 2.4.4).
+- Version source of truth: `manifest.json` (currently 3.0.0).
 
 ## Brand Commitments
 

@@ -86,6 +86,23 @@ h1 svg {
   margin-top: 6px;
 }
 
+.update-banner {
+  display: block;
+  margin-top: 8px;
+  padding: 6px 10px;
+  border-radius: 6px;
+  background: rgba(108, 92, 231, 0.18);
+  color: #fff;
+  font-size: 12px;
+  font-weight: 500;
+  text-decoration: none;
+}
+
+.update-banner:hover,
+.update-banner:focus-visible {
+  background: rgba(108, 92, 231, 0.32);
+}
+
 /* ── Sections ─────────────────────────────────────────────────────── */
 
 main {

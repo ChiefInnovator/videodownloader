@@ -4,7 +4,7 @@
 
 Built by **Rich Crane** — Microsoft MVP, Founder & Chief AI Officer at MILL5. Part of the **Inventing Fire with AI** initiative.
 
-Detect, extract, and download video content from web pages for offline viewing — including cross-origin iframe embeds and AES-128 encrypted HLS/DASH streams. No analytics. No telemetry. No accounts. Nothing leaves your browser except the segment fetches required to download the video you selected. YouTube videos are available through the optional [Enhanced Downloader](companion/README.md) helper, which hands the YouTube URL to yt-dlp on your computer.
+Detect, extract, and download video content from web pages for offline viewing — including cross-origin iframe embeds and AES-128 encrypted HLS/DASH streams. No analytics. No telemetry. No accounts. Nothing leaves your browser except the segment fetches required to download the video you selected — and, unless you turn it off, one cookie-less request a day to GitHub to see whether a newer release exists. YouTube videos are available through the optional [Enhanced Downloader](companion/README.md) helper, which hands the YouTube URL to yt-dlp on your computer.
 
 ## Features
 
@@ -30,6 +30,7 @@ Detect, extract, and download video content from web pages for offline viewing �
 - **Session-titled files** — captures each video's session/player title when detected, so playing another video on the same page keeps earlier names intact. Historical streams without a captured title use their URL filename.
 - **Audio only** — DASH streams with a separate audio track offer "Audio only (.m4a)": the original AAC track wrapped as M4A, no re-encoding
 - **SharePoint / OneDrive Stream** — on a `stream.aspx` page the original MP4 is offered as one file through SharePoint's own download (the same file as Stream's Download button; refused by SharePoint if you lack download rights). Stream's per-chunk encrypted playback segments are never listed
+- **Update indicator** — once a day the extension asks GitHub for the latest release number; when a newer version exists the popup shows **Update available** with a link to the release (no cookies or identifiers sent; turn off in Settings)
 - **Copy link** — copy any detected video's direct or manifest URL (e.g. to open in VLC)
 - **Reduced motion** — the popup honors the OS "reduce motion" setting
 - **Slides download** — detects slide-deck links (PDF/PPT/Key) in any frame, lists them, and downloads them alongside the video
