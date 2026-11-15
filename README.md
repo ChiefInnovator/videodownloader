@@ -4,7 +4,7 @@
 
 Built by **Rich Crane** — Microsoft MVP, Founder & Chief AI Officer at MILL5. Part of the **Inventing Fire with AI** initiative.
 
-Detect, extract, and download video content from web pages for offline viewing — including cross-origin iframe embeds and AES-128 encrypted HLS/DASH streams. No analytics. No telemetry. No accounts. Nothing leaves your browser except the segment fetches required to download the video you selected. Sites the extension can't handle on its own (such as YouTube) are covered by the optional [Enhanced Downloader](companion/README.md) helper, which hands the video URL to yt-dlp on your computer.
+Detect, extract, and download video content from web pages for offline viewing — including cross-origin iframe embeds and AES-128 encrypted HLS/DASH streams. No analytics. No telemetry. No accounts. Nothing leaves your browser except the segment fetches required to download the video you selected. YouTube videos are available through the optional [Enhanced Downloader](companion/README.md) helper, which hands the YouTube URL to yt-dlp on your computer.
 
 ## Features
 

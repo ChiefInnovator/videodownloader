@@ -233,12 +233,13 @@
    */
   function scanSharePointStream() {
     if (window.top !== window) return;
-    if (!/\/_layouts\/15\/stream\.aspx$/i.test(location.pathname)) return;
+    const page = /^(.*)\/_layouts\/15\/stream\.aspx$/i.exec(location.pathname);
+    if (!page) return;
+    // The site (or nested subsite) is whatever precedes /_layouts/15/ on
+    // this page — '' for a root site — and the file must live under it.
+    const site = page[1];
     const id = new URLSearchParams(location.search).get('id');
-    if (!id || !id.startsWith('/') || !VIDEO_EXT_RE.test(id)) return;
-    // Server-relative site: /teams/<name>, /sites/<name>, or /personal/<user>
-    const site = id.split('/').slice(0, 3).join('/');
-    if (!/^\/(teams|sites|personal)\/[^/]+$/i.test(site)) return;
+    if (!id || !id.toLowerCase().startsWith(`${site.toLowerCase()}/`) || !VIDEO_EXT_RE.test(id)) return;
     const url = `${location.origin}${site}/_layouts/15/download.aspx?SourceUrl=${encodeURIComponent(id)}`;
     if (found.has(url)) return;
     const file = id.split('/').pop();

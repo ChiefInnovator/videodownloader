@@ -474,7 +474,14 @@ test('SharePoint stream.aspx offers the original file via download.aspx', async 
   assert.equal(videos[0].title, '2026.11.12 Product Pulse - November 2026');
   assert.equal(videos[0].mime, 'video/mp4');
 
-  // Non-video items and unexpected paths are ignored.
+  // Nested subsites use their own download endpoint.
+  const nestedId = '/teams/parent/subsite/Shared Documents/clip.mp4';
+  const nested = await runDetector(`https://tenant.sharepoint.com/teams/parent/subsite/_layouts/15/stream.aspx?id=${encodeURIComponent(nestedId)}`);
+  assert.equal(nested.videos[0].url,
+    `https://tenant.sharepoint.com/teams/parent/subsite/_layouts/15/download.aspx?SourceUrl=${encodeURIComponent(nestedId)}`);
+
+  // Non-video items, ids outside this site, and unexpected paths are ignored.
+  assert.equal((await runDetector(`https://tenant.sharepoint.com/teams/other/_layouts/15/stream.aspx?id=${encodeURIComponent(id)}`)).videos.length, 0);
   assert.equal((await runDetector('https://tenant.sharepoint.com/teams/x/_layouts/15/stream.aspx?id=%2Fteams%2Fx%2Fdoc.pdf')).videos.length, 0);
   assert.equal((await runDetector('https://tenant.sharepoint.com/teams/x/_layouts/15/stream.aspx?id=relative.mp4')).videos.length, 0);
 });
