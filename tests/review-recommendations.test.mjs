@@ -342,6 +342,8 @@ import sys, time
 if '--version' in sys.argv: print('2099.01.01'); sys.exit(0)
 assert sys.argv[-2] == '--', sys.argv
 if 'SLOW' in sys.argv[-1]: time.sleep(30)
+if '--cookies-from-browser' in sys.argv and 'COOKIES' in sys.argv[-1]:
+    print('ERROR: could not find chrome cookies database in "/x"', file=sys.stderr); sys.exit(1)
 print('VDPROG  42.0%|1.00MiB/s|00:03', flush=True)
 print('VDFILE ' + sys.argv[sys.argv.index('-P') + 1] + '/clip.mp4', flush=True)
 `);
@@ -377,6 +379,11 @@ print('VDFILE ' + sys.argv[sys.argv.index('-P') + 1] + '/clip.mp4', flush=True)
   const progress = await next(r => r.type === 'progress');
   assert.equal(progress.percent, 42);
   assert.equal((await next(r => r.type === 'done')).file, path.join(dir, 'Downloads', 'Videos', 'clip.mp4'));
+
+  // Cookie extraction failure falls back to a cookie-less download.
+  send({ type: 'download', url: 'https://www.youtube.com/watch?v=COOKIESxxxx', cookiesFromBrowser: true });
+  const fallback = await next(r => r.type === 'done');
+  assert.match(fallback.note, /without them/);
 
   send({ type: 'download', url: 'https://www.youtube.com/watch?v=SLOWSLOWSLO' });
   await new Promise(r => setTimeout(r, 300));

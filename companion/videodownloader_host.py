@@ -11,7 +11,7 @@ Messages from the extension:
   {"type": "download", "url": ..., "quality": "best|1080|720|480|audio",
    "subfolder": "", "cookiesFromBrowser": false}
       -> {"type": "progress", "percent": float, "speed": str, "eta": str} ...
-      -> {"type": "done", "file": "/abs/path"} | {"type": "error", "error": str}
+      -> {"type": "done", "file": "/abs/path", "note"?: str} | {"type": "error", "error": str}
   {"type": "cancel"}
       -> stops the running download ({"type": "error", "cancelled": true, ...})
 
@@ -36,6 +36,7 @@ MAX_MESSAGE = 1024 * 1024  # Chrome caps extension -> host messages at 4 GB; we 
 YOUTUBE_HOST_RE = re.compile(
     r"^(?:www\.|m\.|music\.)?(?:youtube\.com|youtube-nocookie\.com)$|^youtu\.be$", re.I)
 PROGRESS_PREFIX = "VDPROG "
+COOKIE_ERROR_RE = re.compile(r"cookies? database|could not copy .*cookie|cookie.*(keychain|decrypt)|failed to (load|read) cookies", re.I)
 FILE_PREFIX = "VDFILE "
 # Chrome launches hosts with a minimal PATH; look in the usual install places too.
 EXTRA_PATHS = ["/opt/homebrew/bin", "/usr/local/bin", "/usr/bin",
@@ -200,12 +201,35 @@ def run_download(msg):
 
     env = dict(os.environ, PATH=_search_path())
     _cancelled = False
+    code, final_file, errors = _run_ytdlp(cmd, env)
+    note = ""
+
+    # Reading Chrome's cookies can fail when Chrome itself launches this host
+    # (macOS may deny access to the profile folder, or the Keychain prompt is
+    # refused). Public videos don't need them: retry once without cookies.
+    if (not _cancelled and code != 0 and msg.get("cookiesFromBrowser")
+            and any(COOKIE_ERROR_RE.search(e) for e in errors)):
+        retry = dict(msg, cookiesFromBrowser=False)
+        code, final_file, errors = _run_ytdlp(build_command(ytdlp, retry, bool(find_ffmpeg())), env)
+        note = "Chrome sign-in cookies were unavailable; downloaded without them"
+
+    if _cancelled:
+        send({"type": "error", "cancelled": True, "error": "Cancelled"})
+    elif code == 0 and final_file:
+        send({"type": "done", "file": final_file, **({"note": note} if note else {})})
+    else:
+        detail = next((e for e in reversed(errors) if e.startswith("ERROR")), errors[-1] if errors else "")
+        send({"type": "error", "error": detail.replace("ERROR: ", "", 1) or f"yt-dlp exited with code {code}"})
+
+
+def _run_ytdlp(cmd, env):
+    """Run yt-dlp, relaying progress. Returns (exit code, final file, stderr lines)."""
+    global _proc
     try:
         _proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
                                  stdin=subprocess.DEVNULL, text=True, bufsize=1, env=env)
     except OSError as err:
-        send({"type": "error", "error": f"Could not start yt-dlp: {err}"})
-        return
+        return -1, "", [f"ERROR: Could not start yt-dlp: {err}"]
 
     errors = []
 
@@ -231,14 +255,7 @@ def run_download(msg):
     code = _proc.wait()
     stderr_thread.join(timeout=2)
     _proc = None
-
-    if _cancelled:
-        send({"type": "error", "cancelled": True, "error": "Cancelled"})
-    elif code == 0 and final_file:
-        send({"type": "done", "file": final_file})
-    else:
-        detail = next((e for e in reversed(errors) if e.startswith("ERROR")), errors[-1] if errors else "")
-        send({"type": "error", "error": detail.replace("ERROR: ", "", 1) or f"yt-dlp exited with code {code}"})
+    return code, final_file, errors
 
 
 def cancel():

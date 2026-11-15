@@ -1014,7 +1014,8 @@ function updateCompanionProgress(els, msg) {
 
   if (msg.state === 'complete') {
     els.fill.classList.add('complete');
-    els.text.textContent = msg.file ? `Saved to ${msg.file}` : 'Download complete';
+    els.text.textContent = (msg.file ? `Saved to ${msg.file}` : 'Download complete') +
+      (msg.note ? ` (${msg.note})` : '');
     els.text.title = msg.file || '';
     els.btn.textContent = 'Done';
     els.ctrl.innerHTML = '';
