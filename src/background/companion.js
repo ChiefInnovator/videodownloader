@@ -111,7 +111,7 @@ export async function startCompanionDownload({ jobId, url, quality, subfolder = 
   const port = connect();
   const job = {
     id: jobId, port, kind: 'companion', state: 'running', sourceUrl: url,
-    percent: 0, speedText: '', etaText: '', file: '', error: '', startTime: Date.now(),
+    percent: 0, speedText: '', etaText: '', file: '', note: '', error: '', startTime: Date.now(),
   };
   jobs.set(jobId, job);
   const report = () => onProgress?.(publicCompanionJob(job));
@@ -137,6 +137,7 @@ export async function startCompanionDownload({ jobId, url, quality, subfolder = 
         job.state = 'complete';
         job.percent = 100;
         job.file = String(msg.file || '');
+        job.note = String(msg.note || '');
         report();
         settle(resolve, { jobId, file: job.file });
       } else if (msg.type === 'error') {

@@ -25,7 +25,7 @@ Detect, extract, and download video content from web pages for offline viewing �
 - **DRM detection** — warns users when Widevine/PlayReady/FairPlay (incl. `skd://` and DRM `KEYFORMAT`s) or Adobe Access prevents download
 - Clean dark-themed popup UI with video thumbnails and metadata
 - Configurable preferred quality and download subfolder
-- **YouTube via companion app (optional)** — a native-messaging helper wrapping [yt-dlp](https://github.com/yt-dlp/yt-dlp); off by default, not included in the Chrome Web Store build — see [companion/README.md](companion/README.md)
+- **YouTube via companion app (optional)** — a native-messaging helper wrapping [yt-dlp](https://github.com/yt-dlp/yt-dlp); off by default, not included in the Chrome Web Store build — see [companion/README.md](companion/README.md). If the optional Chrome sign-in can't be read, it retries once without it (sign-in-only videos then fail)
 - SPA-compatible via MutationObserver for dynamically loaded content
 - **Session-titled files** — captures each video's session/player title when detected, so playing another video on the same page keeps earlier names intact. Historical streams without a captured title use their URL filename.
 - **Audio only** — DASH streams with a separate audio track offer "Audio only (.m4a)": the original AAC track wrapped as M4A, no re-encoding

@@ -49,6 +49,10 @@ shows in the popup; the finished file's path appears when done.
 Optional: **Let yt-dlp use your Chrome sign-in** passes
 `--cookies-from-browser chrome`, so yt-dlp can read Chrome's cookies for
 age-restricted or members-only videos. On macOS this asks for Keychain access.
+If yt-dlp cannot read the cookies (for example when macOS blocks the
+Chrome-launched helper from Chrome's profile folder), the helper retries once
+without them; the popup then says the download finished without your sign-in.
+Videos that require sign-in still fail in that case.
 
 ## Protocol
 
@@ -57,7 +61,7 @@ Messages are native-messaging frames (4-byte little-endian length + JSON):
 | Extension → host | Host → extension |
 | --- | --- |
 | `{"type":"probe"}` | `{"type":"probe","ok":true,"version":"1.0.0","ytdlp":"2026.10.26","ffmpeg":true}` |
-| `{"type":"download","url":…,"quality":"best\|1080\|720\|480\|audio","subfolder":"","cookiesFromBrowser":false}` | `{"type":"progress","percent":42.0,"speed":"3.1MiB/s","eta":"00:12"}` … then `{"type":"done","file":"/abs/path.mp4"}` or `{"type":"error","error":…}` |
+| `{"type":"download","url":…,"quality":"best\|1080\|720\|480\|audio","subfolder":"","cookiesFromBrowser":false}` | `{"type":"progress","percent":42.0,"speed":"3.1MiB/s","eta":"00:12"}` … then `{"type":"done","file":"/abs/path.mp4","note"?:…}` or `{"type":"error","error":…}` |
 | `{"type":"cancel"}` | `{"type":"error","cancelled":true,"error":"Cancelled"}` |
 
 Host name: `com.inventingfire.videodownloader`. Set `VIDEODOWNLOADER_YTDLP`

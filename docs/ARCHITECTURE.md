@@ -212,6 +212,7 @@ popup ◄──streamProgress (kind: companion)── service worker ◄── p
 - The host accepts only YouTube URLs, passes the URL after `--` so it cannot be read as an option, and rejects subfolders containing `..` or absolute paths.
 - Quality maps to a yt-dlp format selector; with ffmpeg it merges best video+audio into MP4, without ffmpeg it uses single-file formats.
 - Files are written by yt-dlp, not `chrome.downloads`; the popup shows the saved path.
+- With **Let yt-dlp use your Chrome sign-in**, a cookie-read failure (common when Chrome launches the host) triggers one retry without `--cookies-from-browser`; `done` then carries a `note` the popup appends. Sign-in-only videos still fail.
 - `scripts/package.sh --store` removes `nativeMessaging` from `optional_permissions`, which hides and disables the feature.
 
 See [companion/README.md](../companion/README.md) for setup and the message protocol.
