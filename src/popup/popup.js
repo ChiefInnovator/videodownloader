@@ -55,6 +55,8 @@ document.addEventListener('DOMContentLoaded', () => {
   const ver = document.getElementById('version');
   if (ver) ver.textContent = 'v' + chrome.runtime.getManifest().version;
 
+  showUpdateBanner();
+
   // Check if terms have been accepted; redirect to terms page if not
   chrome.storage.local.get({ termsAccepted: false }, (result) => {
     if (!result.termsAccepted) {
@@ -72,6 +74,22 @@ chrome.runtime.onMessage.addListener((msg) => {
   if (msg.action === 'downloadProgress') updateProgress(msg);
   if (msg.action === 'streamProgress') updateStreamProgress(msg);
 });
+
+// ── Update indicator ────────────────────────────────────────────────
+
+/** Show "Update available" when GitHub has a newer release (see update-check.js). */
+async function showUpdateBanner() {
+  const banner = document.getElementById('update-banner');
+  if (!banner) return;
+  try {
+    const status = await chrome.runtime.sendMessage({ action: 'getUpdateStatus' });
+    if (!status?.available) return;
+    banner.textContent = `Update available: v${status.latest} (you have v${status.current}) \u2014 get it`;
+    banner.href = status.url;
+    banner.title = 'Opens the GitHub release page';
+    banner.classList.remove('hidden');
+  } catch { /* worker unavailable: no banner */ }
+}
 
 // ── Load & merge videos ─────────────────────────────────────────────
 

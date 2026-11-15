@@ -2,11 +2,11 @@
 
 > A free Chrome extension that detects and downloads video content from web pages — HTML5 video, HLS (.m3u8), DASH (.mpd), AES‑128 encrypted streams, and cross‑origin iframe embeds from platforms like Medius, ON24, Vimeo, Mux, Wistia, Brightcove, JW Player, Cloudflare Stream, Vidyard, and Panopto. Built for offline viewing, archival, research, accessibility workflows, and compliance. Manifest V3, runs entirely in your browser, no analytics, no telemetry, no tracking.
 
-The core motivation: a free video downloader that doesn't track what you are doing. No accounts, no analytics, no telemetry, no third‑party network calls. All manifest parsing, segment fetching, AES‑128 decryption, and file assembly happen locally in the user's browser using native Web APIs (fetch, crypto.subtle, chrome.downloads).
+The core motivation: a free video downloader that doesn't track what you are doing. No accounts, no analytics, no telemetry, no third‑party network calls other than an optional once‑a‑day, cookie‑less check of GitHub for a newer release. All manifest parsing, segment fetching, AES‑128 decryption, and file assembly happen locally in the user's browser using native Web APIs (fetch, crypto.subtle, chrome.downloads).
 
 Video Downloader is developed by Richard Crane (Microsoft MVP, founder and Chief AI Officer of MILL5, host of the *Inventing Fire with AI* podcast). It is part of the Inventing Fire with AI initiative. The extension respects content protection — it detects Widevine, PlayReady, and FairPlay DRM and warns the user rather than attempting to circumvent it.
 
-The current release is v2.4.4 (published 2026-11-02). It is distributed as a Chrome Manifest V3 extension via GitHub Releases (the Chrome Web Store listing is in review).
+The current release is v3.0.0 (published 2026-11-15). It is distributed as a Chrome Manifest V3 extension via GitHub Releases (the Chrome Web Store listing is in review).
 
 ## Install
 
@@ -49,7 +49,7 @@ The current release is v2.4.4 (published 2026-11-02). It is distributed as a Chr
 - **SPA compatibility** — MutationObserver re‑scans the DOM when new video elements or iframes appear (React, Vue, Svelte, lazy‑loaded pages).
 - **Quality selection** — picks the preferred variant for multi‑bitrate HLS and multi‑representation DASH.
 - **Configurable options** — preferred quality, download subfolder, and the optional Enhanced Downloader.
-- **Privacy** — no analytics, no telemetry, no third‑party requests. Nothing leaves the browser except the segment fetches required to download the video you selected (with the companion, yt‑dlp on the same computer fetches the chosen YouTube video).
+- **Privacy** — no analytics, no telemetry, no third‑party requests. Nothing leaves the browser except the segment fetches required to download the video you selected, plus a once‑a‑day, cookie‑less update check against GitHub Releases (can be turned off) (with the companion, yt‑dlp on the same computer fetches the chosen YouTube video).
 
 ## Intended use cases
 

@@ -31,6 +31,22 @@
       <p class="hint">Relative to your default Chrome download directory. Leave blank for default.</p>
     </section>
 
+    <section class="checkbox-section">
+      <label>
+        <input id="checkForUpdates" type="checkbox">
+        Check for new versions
+      </label>
+      <p class="hint">
+        Once a day the extension asks GitHub for the latest release number and shows
+        &ldquo;Update available&rdquo; in the popup. No cookies, identifiers, or usage data are sent.
+        This is the only request the extension makes that isn&rsquo;t part of a download.
+      </p>
+      <div class="actions">
+        <button type="button" id="btn-check-update" class="btn">Check now</button>
+        <span id="update-status" class="save-status"></span>
+      </div>
+    </section>
+
     <section id="companion-section" class="companion-section" hidden>
       <h2>Enhanced Downloader</h2>
       <p class="hint">

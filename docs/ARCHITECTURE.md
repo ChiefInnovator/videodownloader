@@ -101,6 +101,7 @@ Persists user preferences to `chrome.storage.sync`:
 | `downloadPath` | Subfolder within Chrome's download directory (also used by the companion under `~/Downloads`) |
 | `companionEnabled` | Enhanced Downloader (YouTube via the companion helper); toggling it requests/removes the optional `nativeMessaging` permission |
 | `ytCookiesFromBrowser` | Pass `--cookies-from-browser chrome` to yt-dlp |
+| `checkForUpdates` | Daily update check against GitHub Releases (default on) |
 
 The companion section only appears when the build declares `nativeMessaging` in `optional_permissions` (not in the store build).
 
@@ -193,6 +194,7 @@ Tokens are held in memory only — never persisted to storage.
 
 - The extension requests `<all_urls>` host permission for network interception and cross-origin manifest/segment fetches. It has no `cookies` permission.
 - The service worker only accepts commands from the extension's own pages; content scripts cannot start downloads or read auth context.
+- Update check (`src/background/update-check.js`): the only request not tied to a download. At most once a day (on browser start/install, or when the popup asks and the last check is stale) it fetches `api.github.com/repos/ChiefInnovator/videodownloader/releases/latest` with `credentials: 'omit'`, compares `tag_name` with the manifest version, and stores the result in `chrome.storage.local`. The popup shows **Update available** linking only to this repository's release page. Off when `checkForUpdates` is false.
 - `nativeMessaging` is optional, requested only when the user enables the companion, and stripped from the store build.
 - Authentication tokens are held in memory only and never written to `chrome.storage` or disk.
 - No data leaves the browser — all processing (parsing, decryption, assembly) is local. With the companion enabled, a YouTube URL is handed to yt-dlp on the same computer, which fetches only that video.
