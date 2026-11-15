@@ -160,7 +160,7 @@ The [Release workflow](.github/workflows/release.yml) packages the extension and
 - **Live HLS** — only the segments currently in the playlist window are captured; the popup marks these streams **LIVE**
 - **Memory** — a stream is assembled in memory before saving, so very long high-bitrate downloads need free RAM roughly equal to the file size
 - **No format conversion** — files keep the container they were served in
-- **YouTube** works only through the optional Enhanced Downloader helper (yt-dlp on your computer); the extension itself never extracts YouTube streams
+- **YouTube** works only through the optional Enhanced Downloader helper (yt-dlp on your computer); the extension itself never extracts YouTube streams. On youtube.com only the video being watched is listed (sidebar and home links are ignored), and common yt-dlp refusals (members-only, age-restricted, private, unavailable, not started yet, region-locked) are shown as plain guidance
 
 See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for full technical details, detection strategy, and edge cases.
 
