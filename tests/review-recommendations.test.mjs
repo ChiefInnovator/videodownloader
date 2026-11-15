@@ -491,3 +491,76 @@ test('SharePoint stream.aspx offers the original file via download.aspx', async 
   assert.equal((await runDetector('https://tenant.sharepoint.com/teams/x/_layouts/15/stream.aspx?id=%2Fteams%2Fx%2Fdoc.pdf')).videos.length, 0);
   assert.equal((await runDetector('https://tenant.sharepoint.com/teams/x/_layouts/15/stream.aspx?id=relative.mp4')).videos.length, 0);
 });
+
+// ── Update indicator ────────────────────────────────────────────────
+
+function localStorageDouble(h) {
+  const store = {};
+  h.chrome.storage.local = {
+    get: async (key) => (typeof key === 'string' ? { [key]: store[key] } : { ...key, ...store }),
+    set: async (values) => Object.assign(store, values),
+  };
+  return store;
+}
+
+test('update check: semver comparison', async () => {
+  const h = await harness();
+  const u = await h.utils('../background/update-check');
+  assert.equal(u.isNewer('v3.0.1', '3.0.0'), true);
+  assert.equal(u.isNewer('3.1.0', '3.0.9'), true);
+  assert.equal(u.isNewer('v10.0.0', '9.9.9'), true);
+  assert.equal(u.isNewer('v3.0.0', '3.0.0'), false);
+  assert.equal(u.isNewer('v2.9.9', '3.0.0'), false);
+  assert.equal(u.isNewer('nightly', '3.0.0'), false);
+  const fallback = 'https://github.com/ChiefInnovator/videodownloader/releases/latest';
+  assert.equal(u.safeReleaseUrl('https://github.com/ChiefInnovator/videodownloader/releases/tag/v3.1.0'),
+    'https://github.com/ChiefInnovator/videodownloader/releases/tag/v3.1.0');
+  assert.equal(u.safeReleaseUrl('https://github.com/ChiefInnovator/videodownloader/releases/../../other-repo/releases/tag/v1.0.0'), fallback);
+  assert.equal(u.safeReleaseUrl('http://github.com/ChiefInnovator/videodownloader/releases/tag/v3.1.0'), fallback);
+  assert.equal(u.safeReleaseUrl('https://github.com.evil.example/ChiefInnovator/videodownloader/releases/tag/v3.1.0'), fallback);
+  assert.equal(u.safeReleaseUrl(null), fallback);
+});
+
+test('update check: daily, cookie-less, can be turned off, links only to this repo', async () => {
+  const h = await harness();
+  const store = localStorageDouble(h);
+  const api = 'https://api.github.com/repos/ChiefInnovator/videodownloader/releases/latest';
+  h.routes.set(api, JSON.stringify({ tag_name: 'v99.0.0', html_url: 'https://github.com/ChiefInnovator/videodownloader/releases/tag/v99.0.0' }));
+  const current = h.chrome.runtime.getManifest().version;
+
+  const first = await h.dispatch({ action: 'getUpdateStatus' });
+  assert.equal(first.available, true);
+  assert.equal(first.latest, '99.0.0');
+  assert.equal(first.current, current);
+  assert.equal(first.url, 'https://github.com/ChiefInnovator/videodownloader/releases/tag/v99.0.0');
+  const calls = () => h.requests.filter(r => r.url === api);
+  assert.equal(calls().length, 1);
+  assert.equal(calls()[0].opts.credentials, 'omit');
+
+  // Within a day: answered from storage, no new request.
+  await h.dispatch({ action: 'getUpdateStatus' });
+  assert.equal(calls().length, 1);
+  // "Check now" forces one.
+  await h.dispatch({ action: 'checkForUpdateNow' });
+  assert.equal(calls().length, 2);
+
+  // A release URL outside this repository is never linked.
+  h.routes.set(api, JSON.stringify({ tag_name: 'v99.0.1', html_url: 'https://evil.example/download' }));
+  assert.equal((await h.dispatch({ action: 'checkForUpdateNow' })).url,
+    'https://github.com/ChiefInnovator/videodownloader/releases/latest');
+
+  // Turned off: no request and no indicator.
+  h.syncValues.checkForUpdates = false;
+  const off = await h.dispatch({ action: 'checkForUpdateNow' });
+  assert.equal(off.available, false);
+  assert.equal(off.enabled, false);
+  assert.equal(calls().length, 3);
+
+  // Failures are stored, not thrown.
+  h.syncValues.checkForUpdates = true;
+  delete store.updateCheck;
+  h.routes.delete(api);
+  const failed = await h.dispatch({ action: 'checkForUpdateNow' });
+  assert.ok(failed.error);
+  assert.equal(failed.available, false);
+});
