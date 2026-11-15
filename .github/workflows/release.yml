@@ -21,9 +21,12 @@ jobs:
             exit 1
           fi
 
-      - name: Package extension
+      - name: Package extension and companion
         id: pkg
-        run: echo "zip=$(bash scripts/package.sh)" >> "$GITHUB_OUTPUT"
+        run: |
+          mapfile -t ZIPS < <(bash scripts/package.sh)
+          echo "zip=${ZIPS[0]}" >> "$GITHUB_OUTPUT"
+          echo "companion=${ZIPS[1]}" >> "$GITHUB_OUTPUT"
 
       - name: Create GitHub release
         env:
@@ -31,7 +34,7 @@ jobs:
         run: |
           # Install steps go first; GitHub's generated changelog is appended.
           sed "s/{{VERSION}}/${GITHUB_REF_NAME}/g" .github/release-notes.md > "$RUNNER_TEMP/notes.md"
-          gh release create "${GITHUB_REF_NAME}" "${{ steps.pkg.outputs.zip }}" \
+          gh release create "${GITHUB_REF_NAME}" "${{ steps.pkg.outputs.zip }}" "${{ steps.pkg.outputs.companion }}" \
             --title "Video Downloader ${GITHUB_REF_NAME}" \
             --notes-file "$RUNNER_TEMP/notes.md" \
             --generate-notes

@@ -54,6 +54,8 @@ const segmentBuffers = new Map();
  * @param {Function}      opts.onProgress      — called with job state on every segment
  * @param {Function}      opts.onComplete      — called with final Blob
  * @param {Function}      opts.onError         — called with Error
+ * @param {Object}        [opts.meta]          — extra fields shown in job listings
+ *                                               (e.g. sourceUrl, filename)
  * @returns {string} jobId
  */
 export function startSegmentDownload(opts) {
@@ -68,6 +70,7 @@ export function startSegmentDownload(opts) {
     onProgress = () => {},
     onComplete = () => {},
     onError = () => {},
+    meta = {},
   } = opts;
 
   if (!keyFetcher || !segmentFetcher) {
@@ -78,6 +81,7 @@ export function startSegmentDownload(opts) {
   abortControllers.set(jobId, controller);
 
   const job = {
+    ...meta,
     id: jobId,
     state: 'running',
     totalSegments: segments.length,
@@ -154,6 +158,22 @@ export function listJobs() {
   return Array.from(jobs.values());
 }
 
+/**
+ * A job as plain data (no callbacks, Sets, or buffers) for messaging.
+ */
+export function publicJob(job) {
+  if (!job) return null;
+  const { onProgress, restart, skippedIndices, ...rest } = job;
+  return rest;
+}
+
+/** Drop everything a finished job holds, including its segment buffers. */
+function releaseJob(jobId) {
+  abortControllers.delete(jobId);
+  segmentBuffers.delete(jobId);
+  jobs.delete(jobId);
+}
+
 // ── Download pipeline ───────────────────────────────────────────────
 
 async function runPipeline(
@@ -182,15 +202,16 @@ async function runPipeline(
 
     job.state = 'complete';
     job.onProgress(job);
+    // The job's restart closure pins every segment buffer; release it now
+    // that the Blob owns the bytes.
+    releaseJob(jobId);
     onComplete(blob);
-
-    segmentBuffers.delete(jobId);
-    abortControllers.delete(jobId);
   } catch (err) {
     if (err.name === 'AbortError' && controller.signal.aborted) return;
     job.state = 'error';
     job.error = err.message;
     job.onProgress(job);
+    releaseJob(jobId);
     onError(err);
   }
 }

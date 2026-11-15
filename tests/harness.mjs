@@ -24,17 +24,19 @@ export function documentDouble() {
 // Only selected lexical functions are exported by the harness; imports are real.
 export async function harness() {
   const requests = [], downloads = [], blobs = [], messages = [];
+  const syncValues = {};
   const routes = new Map();
   let frames = [];
+  const manifest = JSON.parse(await readFile(path.join(root, 'manifest.json'), 'utf8'));
   const chrome = {
-    runtime: { onMessage: event(), getURL: p => `chrome-extension://fixture/${p}`,
+    runtime: { id: 'fixture', onMessage: event(), getURL: p => `chrome-extension://fixture/${p}`, getManifest: () => manifest,
       sendMessage: async msg => { messages.push(msg); return {}; } },
     webRequest: { onBeforeRequest: event(), onHeadersReceived: event() },
     webNavigation: { onCommitted: event(), getAllFrames: async () => frames },
     tabs: { onRemoved: event(), query: async () => [{ id: 7 }], sendMessage: async () => ({}) },
     action: { setBadgeText() {}, setBadgeBackgroundColor() {} },
-    cookies: { getAll: async () => [] },
-    storage: { sync: { get: async defaults => defaults } },
+    storage: { sync: { get: async defaults => ({ ...defaults, ...syncValues }), set: async v => Object.assign(syncValues, v) } },
+    permissions: { contains: async () => true },
     downloads: { onChanged: event(), search: async () => [], download(opts, cb) { downloads.push(opts); cb(downloads.length); } },
     scripting: { executeScript: async ({ func, args, target }) => {
       if (func.name === 'collectPageContext') return [];
@@ -70,10 +72,10 @@ export async function harness() {
   }
   const worker = await load(path.join(root, 'src/background/service-worker.js'));
   await worker.evaluate();
-  const dispatch = msg => new Promise(resolve => {
-    chrome.runtime.onMessage.listeners[0](msg, {}, resolve);
+  const dispatch = (msg, sender = { id: 'fixture' }) => new Promise(resolve => {
+    chrome.runtime.onMessage.listeners[0](msg, sender, resolve);
   });
-  return { chrome, routes, requests, downloads, blobs, messages, document, dispatch,
+  return { chrome, routes, requests, downloads, blobs, messages, document, dispatch, syncValues,
     setFrames(value) { frames = value; },
     async popup() { const m = await load(path.join(root, 'src/popup/popup.js')); await m.evaluate(); return m.namespace; },
     async utils(name) { const m = await load(path.join(root, `src/utils/${name}.js`)); await m.evaluate(); return m.namespace; },

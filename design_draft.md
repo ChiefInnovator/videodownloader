@@ -69,7 +69,7 @@ The following are product acceptance goals. They are not assertions that every p
 ## Non-Goals
 
 - Circumventing DRM, paywalls, authentication, account permissions, or copyright restrictions.
-- Supporting YouTube, Firefox, or Safari as part of the current product contract.
+- Supporting Firefox or Safari as part of the current product contract, or extracting YouTube streams inside the extension (YouTube is available only through the optional, separately installed yt-dlp companion, which store builds omit).
 - Providing a hosted download service, cloud media processing, developer accounts, analytics, advertising, or a remote media library.
 - Editing video, generating captions, translating content, or transcoding arbitrary formats and codecs. Repackaging existing media into a container is distinct from re-encoding it.
 - Guaranteeing compatibility with every website, player configuration, encrypted stream, codec, or browser-managed page.
@@ -220,14 +220,14 @@ The diagram describes existing responsibilities. It does not introduce a backend
 
 ### Permissions and their purposes
 
-The manifest declares `activeTab`, `cookies`, `downloads`, `offscreen`, `scripting`, `storage`, `webRequest`, and `webNavigation`. It also declares `<all_urls>` and explicit ON24/Akamai host patterns already covered by that broad grant.
+The manifest declares `activeTab`, `downloads`, `offscreen`, `scripting`, `storage`, `webRequest`, and `webNavigation`, the `<all_urls>` host grant, and `nativeMessaging` as an optional permission requested only when the user enables the YouTube companion (removed by `scripts/package.sh --store`).
 
 - `downloads` hands direct and assembled files to Chrome and observes download state.
 - `offscreen` supplies the document context needed for object URLs.
 - `scripting` injects the page-context collector and MAIN-world fetch helper.
 - `webNavigation` enumerates frame IDs and parent relationships and resets network discovery on top-level navigation.
 - `webRequest` observes media requests from eligible sites and frames. These listeners are observational; this design does not use request-blocking interception.
-- `cookies` supports existing-session fetch attempts. Cookie handling is a sensitive boundary, not a general account-management feature.
+- There is no `cookies` permission: fetches rely on `credentials: 'include'` or run in the page/player frame, because `Cookie` is a forbidden fetch header that Chrome drops.
 - `storage` retains settings and terms acceptance. `activeTab` is declared for active-page interaction; the broad host grant means the overall permission surface is not limited to a click-time grant.
 
 These are explanations of present configuration, not proof that every permission is minimal. Any permission reduction or addition needs a separate behavioral assessment. Restricted browser pages, unavailable frames, and missing host access remain possible failures. Documentation mentions Chrome/Edge 114+, but the manifest does not declare a minimum Chrome version; the actual supported-version floor needs runtime acceptance.
@@ -262,10 +262,9 @@ Resource fetches receive a context consisting of tab ID, optional frame ID, opti
 | --- | --- | --- |
 | `page-main-world` | Injects an async fetch into the page or selected frame with `credentials: include`; returns bytes encoded as base64. | Sends Range when requested, but does not forward the worker's custom Authorization/Cookie headers or abort signal into that injected function. Subject to the chosen page context and its network behavior. |
 | `content-script` | Messages an eligible detector to fetch with `credentials: include`; returns base64, with a legacy numeric-array decode path in the caller. | Can target a known frame. Without a frame ID, a message response is not a guarantee of selecting the original requesting player. Custom auth headers and cancellation signal are not passed through this message. |
-| `sw-cookies` | Copies supplied headers, optionally gathers cookies, and fetches from the worker. | Manually constructed Cookie headers and cookie access must be verified in the target browser; code that constructs a header is not proof Chrome transmits it as intended. |
 | `direct-fetch` | Fetches from the worker using supplied headers and `credentials: include`. | Keeps raw binary data in the worker and avoids the page-message base64 transfer. Actual cross-origin permission and credential behavior needs browser acceptance. |
 
-For manifests and keys, initial order is MAIN world, content script, worker cookies, direct worker fetch. For segments it is direct worker fetch, MAIN world, content script, worker cookies. The winning strategy is cached by hostname and operation type, not tab, account, frame, scheme, or port. The cached strategy is tried first; failure clears it and retries the full eligible chain. This is a performance heuristic, not a security policy.
+For manifests and keys, initial order is MAIN world, content script, direct worker fetch. For segments it is direct worker fetch, MAIN world, content script. Embed-derived Bearer headers are attached only when the request URL is the embed's origin or an https subdomain of its host. The winning strategy is cached by hostname and operation type, not tab, account, frame, scheme, or port. The cached strategy is tried first; failure clears it and retries the full eligible chain. This is a performance heuristic, not a security policy.
 
 Each strategy attempt has a 30-second promise timeout. The wrapper rejects the wait without aborting the underlying fetch. A single logical segment attempt can invoke several strategies and a signed-URL fallback; the segment retry count is not a total HTTP-request count.
 
@@ -356,7 +355,7 @@ These are internal messages observed in source, not externally exposed APIs. Mes
 | Worker → popup: `streamProgress` | Job ID, job fields, calculated speed | Updates a matching stream-progress element. |
 | Worker ↔ offscreen client | `createObjectURL` plus Blob and MessagePort | Object URL or error on the port. `revokeObjectURL` is a separate message. |
 
-The worker's handler currently ignores its `sender` argument and trusts supplied tab, URL, and job fields. There is no declared `externally_connectable` interface in the manifest, but extension-internal message access and injected-page boundaries still need validation. Spreading the job into progress messages includes callback/Set fields. Chrome serialization behavior and a deliberate serializable state record must be tested before these shapes are treated as reliable contracts.
+The worker's handler accepts messages only from the extension's own pages (`sender.id` matches and `sender.tab` is absent); content scripts and other extensions receive `Forbidden`. Within that boundary it trusts supplied tab, URL, and job fields. There is no declared `externally_connectable` interface in the manifest, but extension-internal message access and injected-page boundaries still need validation. Progress and job-listing messages send a plain-data copy of the job (no callbacks, Sets, or buffers). Chrome serialization behavior and a deliberate serializable state record must be tested before these shapes are treated as reliable contracts.
 
 ### State and persistence
 
@@ -395,7 +394,7 @@ The design keeps media processing local and does not add telemetry. Source pages
 
 Boundaries requiring acceptance are: untrusted DOM → detector; frame results → popup; popup messages → privileged worker; manifest-supplied URLs → credentialed fetch; page MAIN-world code → extension binary transport; Blob → offscreen client → Chrome download. Treat source content, URLs, XML, HTML, and API responses as untrusted input even when a user can watch the player.
 
-Current risks include reused auth headers across destinations, broad cookie fallback, ignored message sender metadata, insufficient request/data-size limits, URL-bearing error strings, and internal job objects sent over extension messaging. Listing these risks is not proof of an exploit; they are concrete behaviors that prevent stronger assurances until resolved and tested.
+Current risks include insufficient request/data-size limits, URL-bearing error strings, and internal job objects sent over extension messaging. Listing these risks is not proof of an exploit; they are concrete behaviors that prevent stronger assurances until resolved and tested.
 
 ### Resource use and performance
 

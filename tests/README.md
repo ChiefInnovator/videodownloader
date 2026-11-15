@@ -27,6 +27,18 @@ and `main`. VM Modules emits an expected experimental-feature warning.
   responses despite one rejected message. `loadVideos` also merges/deduplicates
   network results and renders the expected number of cards using a minimal DOM
   double. Empty/rejected frame enumeration exercises the broadcast fallback.
+- `review-recommendations.test.mjs`: the worker refuses content-script and
+  foreign-extension messages; embed Bearer tokens reach only the embed's site;
+  `googlevideo.com` chunks are never listed; running jobs list by source URL,
+  duplicates are refused, and finished jobs are released; live HLS is flagged.
+  Separate HLS audio saves as a second file for TS and muxes into one MP4 for
+  fMP4 (checked by reading the output's moov/moof boxes). Multi-period DASH
+  output has decode times rebased per period; DASH audio follows the browser
+  language. The YouTube companion flow runs against a native-port double, and
+  the real Python host runs with a fake yt-dlp (`VIDEODOWNLOADER_YTDLP`) to
+  check framing, URL/subfolder validation, progress, and cancel. Packaging
+  checks that `--store` drops `nativeMessaging` and the release build ships the
+  companion zip. The host and packaging tests need `python3` and `unzip`.
 - Worker messages exercise pause/resume with preserved completed bytes, signed
   segment query fallback, cancellation while paused and with an outstanding
   fetch, AES-128 init/media decryption with a short IV, and DASH presentation

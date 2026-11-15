@@ -86,6 +86,25 @@ select:focus, input:focus {
   height: 16px;
 }
 
+.companion-section h2 {
+  font-size: 14px;
+  color: #fff;
+  margin: 24px 0 6px;
+}
+
+.companion-section .checkbox-section {
+  margin: 10px 0;
+}
+
+.companion-section a {
+  color: var(--accent);
+}
+
+.companion-section code {
+  font-size: 11px;
+  word-break: break-all;
+}
+
 .actions {
   display: flex;
   align-items: center;

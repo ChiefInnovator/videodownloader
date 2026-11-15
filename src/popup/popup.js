@@ -8,6 +8,7 @@
 
 import { formatBytes, qualityLabel, extFromUrl, extFromMime, filenameFromUrl } from '../utils/formats.js';
 import { collectPageContext, pickPageTitle, mergeSlides, mergeManifests, safeFilename, isGenericName } from '../utils/page-context.js';
+import { isYouTubeUrl, youTubeWatchUrl } from '../utils/youtube.js';
 
 // ── DOM refs ────────────────────────────────────────────────────────
 
@@ -32,6 +33,19 @@ const progressElements = new Map();
 
 /** @type {Map<string, HTMLElement>} jobId → stream progress DOM elements */
 const streamProgressElements = new Map();
+
+/** @type {Map<string, string>} source URL → card itemId, for reattaching running jobs */
+const cardUrls = new Map();
+
+/** Preferred stream height from Settings (0 = highest available). */
+async function preferredHeight() {
+  try {
+    const { defaultQuality } = await chrome.storage.sync.get({ defaultQuality: '' });
+    return parseInt(defaultQuality, 10) || 0;
+  } catch {
+    return 0;
+  }
+}
 
 // ── Init ────────────────────────────────────────────────────────────
 
@@ -66,6 +80,7 @@ async function loadVideos() {
   listEl.innerHTML = '';
   iframeListEl.innerHTML = '';
   iframeSection.classList.add('hidden');
+  cardUrls.clear();
   slidesListEl.innerHTML = '';
   slidesSection.classList.add('hidden');
   emptyEl.classList.add('hidden');
@@ -155,6 +170,33 @@ async function loadVideos() {
   if (iframes.length > 0) {
     iframeSection.classList.remove('hidden');
     iframes.forEach((iframe, idx) => renderIframeItem(iframe, idx, tab.id));
+  }
+
+  await attachActiveJobs();
+}
+
+/**
+ * Downloads keep running in the service worker after the popup closes.
+ * On reopen, reconnect their cards to live progress instead of offering a
+ * second download of the same stream.
+ */
+async function attachActiveJobs() {
+  let jobs = [];
+  try {
+    jobs = (await chrome.runtime.sendMessage({ action: 'getStreamJobs' }))?.jobs || [];
+  } catch { return; }
+  for (const job of jobs) {
+    if (job.state !== 'running' && job.state !== 'paused') continue;
+    const itemId = cardUrls.get(job.sourceUrl);
+    if (!itemId || streamProgressElements.has(job.id)) continue;
+    const btn = document.querySelector(`[data-item-id="${itemId}"]`);
+    if (!btn) continue;
+    const companion = job.kind === 'companion';
+    btn.disabled = true;
+    btn.textContent = job.state === 'paused' ? 'Paused' : companion ? 'Downloading\u2026' : 'Assembling\u2026';
+    trackStream(job.id, itemId, btn, { pausable: !companion, paused: job.state === 'paused' });
+    const elapsed = Math.max(0.001, (Date.now() - job.startTime) / 1000);
+    updateStreamProgress({ ...job, jobId: job.id, speed: job.totalBytes ? job.totalBytes / elapsed : 0 });
   }
 }
 
@@ -303,6 +345,7 @@ function renderVideoItem(video, idx, tabId) {
 
   // Pending videos have no download action
   if (isPending) return;
+  cardUrls.set(video.url, itemId);
 
   const copyBtn = li.querySelector('.btn-copy');
   copyBtn?.addEventListener('click', async () => {
@@ -334,6 +377,7 @@ function renderVideoItem(video, idx, tabId) {
 // ── Render an iframe embed card ─────────────────────────────────────
 
 function renderIframeItem(iframe, idx, tabId) {
+  if (isYouTubeUrl(iframe.url)) return renderYouTubeItem(iframe, idx);
   const li = document.createElement('li');
   li.className = 'video-item stream-item';
   const itemId = `iframe-${idx}`;
@@ -431,10 +475,12 @@ async function onResolveIframe(iframe, itemId, tabId, li) {
     // Store manifest and auth info on the iframe object for download
     iframe._resolvedManifest = manifestUrl;
     iframe._authHeaders = result.authHeaders || {};
+    iframe._authOrigin = result.authOrigin || null;
     iframe._streamType = isDash ? 'dash' : 'hls';
+    cardUrls.set(manifestUrl, itemId);
 
     // Expand qualities
-    const videoProxy = { url: manifestUrl, _authHeaders: result.authHeaders };
+    const videoProxy = { url: manifestUrl, _authHeaders: result.authHeaders, _authOrigin: iframe._authOrigin };
     if (isHls) await expandHlsQualities(videoProxy, itemId, tabId);
     if (isDash) await expandDashQualities(videoProxy, itemId, tabId);
 
@@ -442,7 +488,7 @@ async function onResolveIframe(iframe, itemId, tabId, li) {
     const dlBtn = actionsEl.querySelector('.btn-download');
     dlBtn.addEventListener('click', () => {
       onStreamDownload(
-        { url: manifestUrl, title: iframe.title, _authHeaders: result.authHeaders },
+        { url: manifestUrl, title: iframe.title, _authHeaders: result.authHeaders, _authOrigin: iframe._authOrigin },
         itemId, tabId, iframe._streamType,
       );
     });
@@ -466,6 +512,7 @@ async function expandHlsQualities(video, itemId, tabId) {
       action: 'expandHls',
       url: video.url,
       authHeaders: video._authHeaders || {},
+      authOrigin: video._authOrigin || null,
       tabId,
     });
 
@@ -477,12 +524,14 @@ async function expandHlsQualities(video, itemId, tabId) {
       video._authHeaders = result.authHeaders;
     }
 
-    // Encrypted badge
-    if (result?.encrypted) {
-      const metaEl = select.closest('.video-item')?.querySelector('.video-meta');
-      if (metaEl && !metaEl.querySelector('.badge-encrypted')) {
-        metaEl.insertAdjacentHTML('beforeend', '<span class="badge badge-encrypted">AES-128</span>');
-      }
+    // Encrypted / live badges
+    const metaEl = select.closest('.video-item')?.querySelector('.video-meta');
+    if (result?.encrypted && metaEl && !metaEl.querySelector('.badge-encrypted')) {
+      metaEl.insertAdjacentHTML('beforeend', '<span class="badge badge-encrypted">AES-128</span>');
+    }
+    if (result?.live && metaEl && !metaEl.querySelector('.badge-live')) {
+      metaEl.insertAdjacentHTML('beforeend',
+        '<span class="badge badge-live" title="Live stream: only the segments listed right now are saved">LIVE</span>');
     }
 
     if (variants.length <= 1) {
@@ -498,6 +547,7 @@ async function expandHlsQualities(video, itemId, tabId) {
         (v.bandwidth ? ` - ${(v.bandwidth / 1000000).toFixed(1)} Mbps` : '');
       select.appendChild(opt);
     }
+    selectPreferred(select, variants, v => v.url, await preferredHeight());
   } catch {
     select.innerHTML = '<option>Quality unavailable</option>';
   }
@@ -514,6 +564,7 @@ async function expandDashQualities(video, itemId, tabId) {
       action: 'expandDash',
       url: video.url,
       authHeaders: video._authHeaders || {},
+      authOrigin: video._authOrigin || null,
       tabId,
     });
 
@@ -524,7 +575,10 @@ async function expandDashQualities(video, itemId, tabId) {
 
     const reps = result?.video || [];
     // Separate audio track → offer an audio-only download (.m4a, no re-encoding)
-    const audio = reps.length > 0 ? (result?.audio || [])[0] : null;
+    const audioList = result?.audio || [];
+    const audio = reps.length > 0
+      ? audioList.find(a => a.id === result?.preferredAudioId) || audioList[0] || null
+      : null;
     if (reps.length + (audio ? 1 : 0) <= 1) {
       select.remove();
       return;
@@ -543,12 +597,23 @@ async function expandDashQualities(video, itemId, tabId) {
       opt.value = audio.id;
       opt.dataset.url = video.url;
       opt.dataset.audioOnly = '1';
-      opt.textContent = 'Audio only (.m4a)';
+      opt.textContent = 'Audio only (.m4a)' + (audio.lang ? ` \u2014 ${audio.lang}` : '');
       select.appendChild(opt);
     }
+    selectPreferred(select, reps, r => r.id, await preferredHeight());
   } catch {
     select.innerHTML = '<option>Quality unavailable</option>';
   }
+}
+
+/**
+ * Preselect the highest quality at or below the preferred height.
+ * `items` are sorted best-first, matching the option order.
+ */
+function selectPreferred(select, items, valueOf, height) {
+  if (!height) return;
+  const match = items.find(i => i.height && i.height <= height);
+  if (match) select.value = valueOf(match);
 }
 
 // ── Direct download handler ─────────────────────────────────────────
@@ -614,9 +679,6 @@ async function onStreamDownload(video, itemId, tabId, streamType) {
   btn.disabled = true;
   btn.textContent = 'Assembling\u2026';
 
-  const progressWrap = document.getElementById(`progress-${itemId}`);
-  progressWrap.classList.add('active');
-
   const jobId = `stream_${Date.now()}_${itemId}`;
   const audioOnly = select?.selectedOptions?.[0]?.dataset.audioOnly === '1';
   const ext = audioOnly ? 'm4a' : streamType === 'dash' ? 'mp4' : 'ts';
@@ -626,34 +688,18 @@ async function onStreamDownload(video, itemId, tabId, streamType) {
   const filename = titled ? `${titled}.${ext}` : `video_${Date.now()}.${ext}`;
 
   downloadSlides(tabId);
-
-  // Register stream progress tracking
-  streamProgressElements.set(jobId, {
-    fill: document.getElementById(`fill-${itemId}`),
-    text: document.getElementById(`ptext-${itemId}`),
-    ctrl: document.getElementById(`pctrl-${itemId}`),
-    btn,
-    wrap: progressWrap,
-    itemId,
-    jobId,
-  });
-
-  // Add pause/cancel controls
-  const ctrlEl = document.getElementById(`pctrl-${itemId}`);
-  ctrlEl.innerHTML = `
-    <button type="button" class="btn btn-sm btn-secondary btn-pause" data-job-id="${jobId}">Pause</button>
-    <button type="button" class="btn btn-sm btn-secondary btn-cancel" data-job-id="${jobId}">Cancel</button>
-  `;
-  ctrlEl.querySelector('.btn-pause').addEventListener('click', () => onPauseStream(jobId));
-  ctrlEl.querySelector('.btn-cancel').addEventListener('click', () => onCancelStream(jobId));
+  trackStream(jobId, itemId, btn, { pausable: true });
 
   try {
     const result = await chrome.runtime.sendMessage({
       action: 'downloadStream',
       url: streamType === 'dash' ? video.url : downloadUrl,
+      masterUrl: streamType === 'hls' ? video.url : null,
+      sourceUrl: video.url,
       streamType,
       representationId,
       authHeaders: video._authHeaders || {},
+      authOrigin: video._authOrigin || null,
       filename,
       tabId,
       jobId,
@@ -663,6 +709,124 @@ async function onStreamDownload(video, itemId, tabId, streamType) {
       throw new Error(result.error);
     }
   } catch (err) {
+    btn.disabled = false;
+    btn.textContent = 'Retry';
+    showProgressError(itemId, err.message);
+  }
+}
+
+/** Register a job's progress elements and add its Pause/Cancel controls. */
+function trackStream(jobId, itemId, btn, { pausable = true, paused = false } = {}) {
+  const progressWrap = document.getElementById(`progress-${itemId}`);
+  progressWrap?.classList.add('active');
+  const ctrlEl = document.getElementById(`pctrl-${itemId}`);
+  streamProgressElements.set(jobId, {
+    fill: document.getElementById(`fill-${itemId}`),
+    text: document.getElementById(`ptext-${itemId}`),
+    ctrl: ctrlEl,
+    btn,
+    wrap: progressWrap,
+    itemId,
+    jobId,
+  });
+
+  ctrlEl.innerHTML = `
+    ${pausable ? `<button type="button" class="btn btn-sm btn-secondary btn-pause" data-job-id="${jobId}">${paused ? 'Resume' : 'Pause'}</button>` : ''}
+    <button type="button" class="btn btn-sm btn-secondary btn-cancel" data-job-id="${jobId}">Cancel</button>
+  `;
+  ctrlEl.querySelector('.btn-pause')?.addEventListener('click', () => onPauseStream(jobId));
+  ctrlEl.querySelector('.btn-cancel').addEventListener('click', () => onCancelStream(jobId));
+}
+
+// ── YouTube (optional companion app) ────────────────────────────────
+
+let companionStatusPromise = null;
+
+function getCompanionStatus() {
+  companionStatusPromise ||= chrome.runtime.sendMessage({ action: 'companionStatus' })
+    .catch(err => ({ available: false, error: err.message }));
+  return companionStatusPromise;
+}
+
+const YOUTUBE_QUALITIES = [
+  ['best', 'Best available'], ['1080', '1080p'], ['720', '720p'], ['480', '480p'], ['audio', 'Audio only (.m4a)'],
+];
+
+function renderYouTubeItem(iframe, idx) {
+  const url = youTubeWatchUrl(iframe.url) || iframe.url;
+  const itemId = `yt-${idx}`;
+  const title = iframe.title || 'YouTube video';
+  const li = document.createElement('li');
+  li.className = 'video-item stream-item';
+  li.innerHTML = `
+    <div class="video-info">
+      <div class="video-thumb-placeholder">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+             stroke-width="2"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+      </div>
+      <div class="video-details">
+        <div class="video-title" title="${escapeAttr(title)}">${escapeHtml(truncate(title, 50))}</div>
+        <div class="video-meta"><span class="badge badge-youtube">YOUTUBE</span><span>via companion app</span></div>
+      </div>
+    </div>
+    <div class="video-actions" id="actions-${itemId}">
+      <span class="progress-text">Checking companion app\u2026</span>
+    </div>
+    <div class="progress-wrap" id="progress-${itemId}">
+      <div class="progress-bar"><div class="progress-bar-fill" id="fill-${itemId}"></div></div>
+      <div class="progress-row">
+        <div class="progress-text" id="ptext-${itemId}"></div>
+        <div class="progress-controls" id="pctrl-${itemId}"></div>
+      </div>
+    </div>
+  `;
+  iframeListEl.appendChild(li);
+  cardUrls.set(url, itemId);
+
+  getCompanionStatus().then(async (status) => {
+    const actionsEl = document.getElementById(`actions-${itemId}`);
+    if (!actionsEl) return;
+    if (!status?.available) {
+      const why = !status?.supported
+        ? 'YouTube downloads aren\u2019t available in this build'
+        : !status.enabled || !status.permitted
+          ? 'YouTube needs the companion app'
+          : `Companion app: ${status.error || 'unavailable'}`;
+      actionsEl.innerHTML = `<span class="progress-text">${escapeHtml(why)}</span>` +
+        (status?.supported ? '<button type="button" class="btn btn-sm btn-secondary btn-setup">Set up</button>' : '');
+      actionsEl.querySelector('.btn-setup')?.addEventListener('click', () => chrome.runtime.openOptionsPage());
+      return;
+    }
+    const preferred = String(await preferredHeight() || '');
+    actionsEl.innerHTML = `
+      <select class="quality-select" id="quality-${itemId}">
+        ${YOUTUBE_QUALITIES.map(([value, label]) =>
+          `<option value="${value}"${value === preferred ? ' selected' : ''}>${label}</option>`).join('')}
+      </select>
+      <button type="button" class="btn btn-primary btn-download" data-item-id="${itemId}">Download</button>
+    `;
+    actionsEl.querySelector('.btn-download').addEventListener('click', () => onCompanionDownload(url, itemId));
+    await attachActiveJobs();
+  });
+}
+
+async function onCompanionDownload(url, itemId) {
+  const btn = document.querySelector(`[data-item-id="${itemId}"]`);
+  if (!btn || btn.disabled) return;
+  const quality = document.getElementById(`quality-${itemId}`)?.value || 'best';
+  const jobId = `yt_${Date.now()}_${itemId}`;
+  btn.disabled = true;
+  btn.textContent = 'Downloading\u2026';
+  trackStream(jobId, itemId, btn, { pausable: false });
+  try {
+    const result = await chrome.runtime.sendMessage({ action: 'companionDownload', url, quality, jobId });
+    if (result?.error) throw new Error(result.error);
+  } catch (err) {
+    const els = streamProgressElements.get(jobId);
+    if (els) {
+      els.ctrl.innerHTML = '';
+      streamProgressElements.delete(jobId);
+    }
     btn.disabled = false;
     btn.textContent = 'Retry';
     showProgressError(itemId, err.message);
@@ -686,7 +850,6 @@ async function downloadSlide(slide, tabId) {
       action: 'download',
       url: slide.url,
       filename: slideFilename(slide),
-      keepExtension: true,
       tabId,
     });
     if (result?.error) throw new Error(result.error);
@@ -800,6 +963,10 @@ function updateProgress(msg) {
 function updateStreamProgress(msg) {
   const els = streamProgressElements.get(msg.jobId);
   if (!els) return;
+  if (msg.kind === 'companion') {
+    updateCompanionProgress(els, msg);
+    return;
+  }
 
   const pct = msg.totalSegments > 0
     ? Math.round((msg.completedSegments / msg.totalSegments) * 100)
@@ -830,6 +997,32 @@ function updateStreamProgress(msg) {
     els.fill.classList.add('error');
     els.fill.style.width = '100%';
     els.text.textContent = `Error: ${msg.error || 'unknown'}`;
+    els.btn.textContent = 'Retry';
+    els.btn.disabled = false;
+    els.ctrl.innerHTML = '';
+    streamProgressElements.delete(msg.jobId);
+  }
+}
+
+/** Progress from the companion app (yt-dlp percent / speed / ETA). */
+function updateCompanionProgress(els, msg) {
+  const pct = Math.max(0, Math.min(100, Math.round(msg.percent || 0)));
+  els.fill.style.width = `${pct}%`;
+  els.text.textContent = `${pct}%` +
+    (msg.speedText ? ` \u2014 ${msg.speedText}` : '') +
+    (msg.etaText ? ` \u2014 ${msg.etaText} left` : '');
+
+  if (msg.state === 'complete') {
+    els.fill.classList.add('complete');
+    els.text.textContent = msg.file ? `Saved to ${msg.file}` : 'Download complete';
+    els.text.title = msg.file || '';
+    els.btn.textContent = 'Done';
+    els.ctrl.innerHTML = '';
+    streamProgressElements.delete(msg.jobId);
+  } else if (msg.state === 'error' || msg.state === 'cancelled') {
+    if (msg.state === 'error') els.fill.classList.add('error');
+    els.fill.style.width = msg.state === 'error' ? '100%' : '0%';
+    els.text.textContent = msg.state === 'error' ? `Error: ${msg.error || 'unknown'}` : 'Cancelled';
     els.btn.textContent = 'Retry';
     els.btn.disabled = false;
     els.ctrl.innerHTML = '';

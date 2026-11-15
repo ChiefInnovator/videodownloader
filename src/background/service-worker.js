@@ -8,26 +8,29 @@
 
 import { extFromUrl, extFromMime, filenameFromUrl, formatBytes } from '../utils/formats.js';
 import {
-  parseMasterPlaylist, parseMediaPlaylistDetailed,
-  isMasterPlaylist, isHlsPlaylist, isAesEncrypted,
+  parseMasterPlaylist, parseMediaPlaylistDetailed, parseAudioRenditions,
+  pickAudioRendition, isMasterPlaylist, isHlsPlaylist, isAesEncrypted,
   withQueryFallback,
 } from '../utils/hls-parser.js';
-import { parseMpd, isDashManifest } from '../utils/dash-parser.js';
 import {
-  classifyIframe, extractAuthTokens, buildAuthHeaders,
-  resolveManifestsFromEmbed,
+  parseMpd, isDashManifest, matchRepresentation, pickAudioRepresentation,
+} from '../utils/dash-parser.js';
+import {
+  extractAuthTokens, buildAuthHeaders, resolveManifestsFromEmbed,
 } from '../utils/iframe-resolver.js';
 import {
   startSegmentDownload, pauseDownload, resumeDownload,
-  cancelDownload, getJobState, listJobs,
+  cancelDownload, getJobState, listJobs, publicJob,
 } from '../utils/segment-downloader.js';
-import {
-  createFetcherSet, fetchTextWithStrategy,
-  getCookiesForUrl,
-} from '../utils/fetch-strategy.js';
+import { createFetcherSet, fetchTextWithStrategy } from '../utils/fetch-strategy.js';
 import { muxFragmentedMp4 } from '../utils/mp4-mux.js';
 import { resolveFromPlatformApi } from '../utils/platform-resolvers.js';
 import { collectPageContext, pickPageTitle } from '../utils/page-context.js';
+import { isYouTubeUrl, isYouTubeMediaHost } from '../utils/youtube.js';
+import {
+  companionSettings, probeCompanion, startCompanionDownload,
+  cancelCompanionDownload, listCompanionJobs,
+} from './companion.js';
 
 // ── Network-level video detection ───────────────────────────────────
 
@@ -134,6 +137,9 @@ function streamTypeOf(url, contentType = '') {
  */
 function recordNetworkVideo(details, contentType = '', contentLength = null, captureTitle = true) {
   if (details.tabId < 0) return;
+  // YouTube's media chunks (googlevideo.com) are partial ranges of
+  // separate audio/video streams — never a usable download.
+  if (isYouTubeMediaHost(details.url)) return;
 
   const isVideoMime = VIDEO_CONTENT_TYPES.some(t =>
     contentType.toLowerCase().includes(t));
@@ -291,24 +297,17 @@ function updateBadge(tabId) {
 /** @type {Map<number, { downloadId: number, url: string, tabId: number }>} */
 const activeDownloads = new Map();
 
-async function startSimpleDownload(url, filename, tabId, { keepExtension = false } = {}) {
-  const settings = await chrome.storage.sync.get({
-    defaultFormat: '',
-    downloadPath: '',
-  });
+async function startSimpleDownload(url, filename, tabId) {
+  const settings = await chrome.storage.sync.get({ downloadPath: '' });
 
   const opts = { url };
 
+  // Files keep the extension of the bytes they contain; the extension
+  // never converts between container formats.
   if (filename) {
     opts.filename = settings.downloadPath
       ? `${settings.downloadPath}/${filename}`
       : filename;
-  }
-
-  // Documents (e.g. slide PDFs) must keep their own extension.
-  if (settings.defaultFormat && filename && !keepExtension) {
-    const ext = settings.defaultFormat;
-    opts.filename = opts.filename.replace(/\.\w+$/, `.${ext}`);
   }
 
   return new Promise((resolve, reject) => {
@@ -427,59 +426,76 @@ async function revokeBlobUrl(url) {
 }
 
 // ── Auth forwarding ─────────────────────────────────────────────────
-// getCookiesForUrl is now imported from fetch-strategy.js
 
 /**
- * Build full auth context for a video platform URL (iframe resolution).
+ * Auth context for an embed URL: a Bearer header from JWT-like query
+ * tokens, scoped to the embed's host (see fetch-strategy authHeadersFor).
+ * HTTP embeds get no token headers at all, so nothing — including the
+ * embed-page fallback fetch — sends them in plaintext. Cookies are not
+ * copied — fetches use credentials: 'include'.
  */
-async function buildFullAuthHeaders(platformUrl) {
-  const tokens = extractAuthTokens(platformUrl);
-  const cookies = await getCookiesForUrl(platformUrl);
-  return buildAuthHeaders(tokens, cookies);
+function buildAuthContext(platformUrl) {
+  let url = null;
+  try { url = new URL(platformUrl); } catch { /* invalid URL */ }
+  if (url?.protocol !== 'https:') return { authHeaders: {}, authOrigin: null };
+  return { authHeaders: buildAuthHeaders(extractAuthTokens(platformUrl)), authOrigin: url.origin };
+}
+
+function uiLanguage() {
+  return chrome.i18n?.getUILanguage?.()
+    || (typeof navigator !== 'undefined' ? navigator.language : '')
+    || '';
 }
 
 // ── HLS quality expansion (enhanced) ────────────────────────────────
 
-async function expandHls(masterUrl, authHeaders = {}, tabId = null) {
+async function expandHls(masterUrl, authHeaders = {}, tabId = null, authOrigin = null) {
   try {
-    const ctx = { tabId, frameId: frameIdForUrl(tabId, masterUrl), authHeaders };
+    const ctx = { tabId, frameId: frameIdForUrl(tabId, masterUrl), authHeaders, authOrigin };
     const body = await fetchTextWithStrategy(masterUrl, 'manifest', ctx);
 
-    if (!isHlsPlaylist(body)) return { variants: [], encrypted: false };
+    if (!isHlsPlaylist(body)) return { variants: [], encrypted: false, live: false };
 
     if (!isMasterPlaylist(body)) {
       const detail = parseMediaPlaylistDetailed(body, masterUrl);
       return {
         variants: [{ url: masterUrl, label: 'Default', bandwidth: 0, width: null, height: null }],
         encrypted: detail.encrypted,
+        live: detail.isLive,
       };
     }
 
     const variants = parseMasterPlaylist(body, masterUrl);
     let encrypted = false;
+    let live = false;
     if (variants.length > 0) {
       try {
         const vBody = await fetchTextWithStrategy(variants[0].url, 'manifest', ctx);
         encrypted = isAesEncrypted(vBody);
+        live = parseMediaPlaylistDetailed(vBody, variants[0].url).isLive;
       } catch { /* best effort */ }
     }
 
-    return { variants, encrypted };
+    return { variants, encrypted, live };
   } catch {
-    return { variants: [], encrypted: false };
+    return { variants: [], encrypted: false, live: false };
   }
 }
 
 // ── DASH quality expansion ──────────────────────────────────────────
 
-async function expandDash(mpdUrl, authHeaders = {}, tabId = null) {
+async function expandDash(mpdUrl, authHeaders = {}, tabId = null, authOrigin = null) {
   try {
-    const ctx = { tabId, frameId: frameIdForUrl(tabId, mpdUrl), authHeaders };
+    const ctx = { tabId, frameId: frameIdForUrl(tabId, mpdUrl), authHeaders, authOrigin };
     const body = await fetchTextWithStrategy(mpdUrl, 'manifest', ctx);
 
     if (!isDashManifest(body)) return { video: [], audio: [] };
 
-    return parseMpd(body, mpdUrl);
+    const { video, audio, hasDrm, periods } = parseMpd(body, mpdUrl);
+    // The audio track a combined download would use, so "Audio only"
+    // offers the same (language-matched) track.
+    const preferredAudioId = pickAudioRepresentation(audio, uiLanguage())?.id ?? null;
+    return { video, audio, hasDrm, periodCount: periods.length, preferredAudioId };
   } catch {
     return { video: [], audio: [] };
   }
@@ -488,7 +504,12 @@ async function expandDash(mpdUrl, authHeaders = {}, tabId = null) {
 // ── Iframe stream resolution ────────────────────────────────────────
 
 async function resolveIframe(iframeUrl, tabId) {
-  const authHeaders = await buildFullAuthHeaders(iframeUrl);
+  const { authHeaders, authOrigin } = buildAuthContext(iframeUrl);
+
+  // YouTube has no manifest to resolve; it goes through the companion app.
+  if (isYouTubeUrl(iframeUrl)) {
+    return { manifests: [], authHeaders, authOrigin, error: 'YouTube needs the companion app (see Settings)' };
+  }
 
   // Strategy 0: known platform (Vimeo, Wistia, JW Player, Mux, Cloudflare
   // Stream, Vidyard, Panopto) — ask its player API for the manifest.
@@ -497,9 +518,9 @@ async function resolveIframe(iframeUrl, tabId) {
   const embedFrames = await framesForDocument(tabId, iframeUrl);
   const frameId = embedFrames[0] ?? null;
   const platform = await resolveFromPlatformApi(iframeUrl, (url) =>
-    fetchTextWithStrategy(url, 'manifest', { tabId, frameId, authHeaders }));
+    fetchTextWithStrategy(url, 'manifest', { tabId, frameId, authHeaders, authOrigin }));
   if (platform) {
-    return { manifests: platform.manifests, streamType: platform.streamType, authHeaders };
+    return { manifests: platform.manifests, streamType: platform.streamType, authHeaders, authOrigin };
   }
 
   // Strategy 1: manifests this embed already loaded — requested by its
@@ -522,52 +543,68 @@ async function resolveIframe(iframeUrl, tabId) {
     }
     if (matchingManifests.length > 0) {
       const streamType = tabManifests.get(matchingManifests[0]).streamType;
-      return { manifests: matchingManifests, streamType, authHeaders };
+      return { manifests: matchingManifests, streamType, authHeaders, authOrigin };
     }
   }
 
   // Strategy 2: Fetch embed page and parse for manifest URLs
   try {
     const result = await resolveManifestsFromEmbed(iframeUrl, authHeaders);
-    return { ...result, authHeaders };
+    return { ...result, authHeaders, authOrigin };
   } catch (err) {
-    return { manifests: [], authHeaders, error: err.message };
+    return { manifests: [], authHeaders, authOrigin, error: err.message };
   }
 }
 
 // ── Stream download orchestration ───────────────────────────────────
 
+function sendStreamProgress(job) {
+  const elapsed = Math.max(0.001, (Date.now() - job.startTime) / 1000);
+  chrome.runtime.sendMessage({
+    action: 'streamProgress',
+    ...publicJob(job),
+    jobId: job.id,
+    speed: job.totalBytes / elapsed,
+  }).catch(() => {});
+}
+
+/** Run a segment job; resolves with whatever `save(blob)` returns. */
+function runSegmentJob({ jobId, segments, outputExt, fetchers, assemble = null, meta, save, onJobStarted }) {
+  return new Promise((resolve, reject) => {
+    Promise.resolve().then(() => onJobStarted?.()); // after the job registers below
+    startSegmentDownload({
+      jobId,
+      segments,
+      initSegment: null,
+      outputExt,
+      keyFetcher: fetchers.keyFetcher,
+      segmentFetcher: fetchers.segmentFetcher,
+      assemble,
+      meta,
+      onProgress: sendStreamProgress,
+      onComplete: async (blob) => {
+        try {
+          resolve(await save(blob));
+        } catch (err) {
+          reject(err);
+        }
+      },
+      onError: reject,
+    });
+  });
+}
+
 /**
- * Download an HLS stream: resolve manifest → fetch segments → decrypt → assemble.
+ * Append a parsed HLS media playlist's segments to a job's segment list.
+ * Each new EXT-X-MAP init segment goes in front of the media it applies to.
+ * @returns {{ initIndex: number, start: number, end: number }}
  */
-async function downloadHlsStream(opts) {
-  const { variantUrl, authHeaders = {}, filename, tabId, jobId } = opts;
-
-  const frameId = frameIdForUrl(tabId, variantUrl);
-  const fetchers = createFetcherSet(tabId, authHeaders, frameId);
-
-  let mediaUrl = variantUrl;
-  let body = await fetchTextWithStrategy(variantUrl, 'manifest', { tabId, frameId, authHeaders });
-  // Single-variant streams have no quality picker, so the popup sends the
-  // master playlist itself — download its best variant.
-  if (isMasterPlaylist(body)) {
-    const [best] = parseMasterPlaylist(body, variantUrl);
-    if (!best) throw new Error('Master playlist has no variants');
-    mediaUrl = best.url;
-    body = await fetchTextWithStrategy(mediaUrl, 'manifest', { tabId, frameId, authHeaders });
-  }
-  const playlist = parseMediaPlaylistDetailed(body, mediaUrl);
-  if (playlist.hasDrm) {
-    throw new Error('This stream is DRM-protected and cannot be downloaded');
-  }
-  if (playlist.segments.length === 0) throw new Error('Playlist has no segments');
-
-  // fMP4 (CMAF) HLS: each EXT-X-MAP init segment goes in front of the
-  // media segments it applies to, and the output is MP4 rather than TS.
-  const segments = [];
+function appendHlsSegments(segments, playlist) {
+  const entry = { initIndex: -1, start: segments.length, end: 0 };
   let lastMap = null;
   for (const seg of playlist.segments) {
     if (seg.map && seg.map !== lastMap) {
+      if (entry.initIndex < 0) entry.initIndex = segments.length;
       segments.push({ ...seg.map, sequence: seg.sequence, required: true });
     }
     lastMap = seg.map;
@@ -579,82 +616,186 @@ async function downloadHlsStream(opts) {
       key: seg.key,
     });
   }
+  entry.end = segments.length;
+  return entry;
+}
+
+/** File extension for a separate HLS audio rendition. */
+function hlsAudioExt(playlist) {
+  if (playlist.isFmp4) return 'm4a';
+  const path = urlPath(playlist.segments[0]?.url || '');
+  return /\.(aac|ac3|ec3|mp3)$/i.exec(path)?.[1].toLowerCase() || 'ts';
+}
+
+/**
+ * Download an HLS stream: resolve manifest → fetch segments → decrypt →
+ * assemble. A separate audio rendition (EXT-X-MEDIA) is muxed in when both
+ * tracks are fMP4, and saved as a second file otherwise.
+ */
+async function downloadHlsStream(opts) {
+  const {
+    variantUrl, masterUrl = null, authHeaders = {}, authOrigin = null,
+    filename, tabId, jobId, sourceUrl = variantUrl, onJobStarted,
+  } = opts;
+
+  const frameId = frameIdForUrl(tabId, variantUrl) ?? (masterUrl ? frameIdForUrl(tabId, masterUrl) : null);
+  const ctx = { tabId, frameId, authHeaders, authOrigin };
+  const fetchText = (url) => fetchTextWithStrategy(url, 'manifest', ctx);
+  const fetchers = createFetcherSet(tabId, authHeaders, frameId, authOrigin);
+
+  let mediaUrl = variantUrl;
+  let body = await fetchText(variantUrl);
+  let master = null;
+  // Single-variant streams have no quality picker, so the popup sends the
+  // master playlist itself — download its best variant.
+  if (isMasterPlaylist(body)) {
+    master = { body, url: variantUrl };
+    const [best] = parseMasterPlaylist(body, variantUrl);
+    if (!best) throw new Error('Master playlist has no variants');
+    mediaUrl = best.url;
+    body = await fetchText(mediaUrl);
+  } else if (masterUrl && masterUrl !== variantUrl) {
+    try {
+      const masterBody = await fetchText(masterUrl);
+      if (isMasterPlaylist(masterBody)) master = { body: masterBody, url: masterUrl };
+    } catch { /* no master: no separate audio */ }
+  }
+
+  const playlist = parseMediaPlaylistDetailed(body, mediaUrl);
+  if (playlist.hasDrm) {
+    throw new Error('This stream is DRM-protected and cannot be downloaded');
+  }
+  if (playlist.segments.length === 0) throw new Error('Playlist has no segments');
+
+  // Separate audio rendition for this variant's AUDIO group, if any.
+  let audio = null;
+  if (master) {
+    const variant = parseMasterPlaylist(master.body, master.url).find(v => v.url === mediaUrl);
+    const rendition = variant?.audioGroup
+      ? pickAudioRendition(parseAudioRenditions(master.body, master.url)[variant.audioGroup], uiLanguage())
+      : null;
+    if (rendition && rendition.url !== mediaUrl) {
+      const audioPlaylist = parseMediaPlaylistDetailed(await fetchText(rendition.url), rendition.url);
+      if (audioPlaylist.hasDrm) {
+        throw new Error('This stream is DRM-protected and cannot be downloaded');
+      }
+      if (audioPlaylist.segments.length) audio = audioPlaylist;
+    }
+  }
+
+  const segments = [];
+  const videoLayout = appendHlsSegments(segments, playlist);
+  const audioLayout = audio ? appendHlsSegments(segments, audio) : null;
+  const mux = !!audio && playlist.isFmp4 && audio.isFmp4;
 
   const ext = playlist.isFmp4 ? 'mp4' : 'ts';
   const finalFilename = filename
     ? filename.replace(/\.ts$/i, `.${ext}`)
     : `video_${Date.now()}.${ext}`;
 
-  return new Promise((resolve, reject) => {
-    startSegmentDownload({
-      jobId,
-      segments,
-      initSegment: null,
-      outputExt: ext,
-      keyFetcher: fetchers.keyFetcher,
-      segmentFetcher: fetchers.segmentFetcher,
-      onProgress: (job) => {
-        chrome.runtime.sendMessage({
-          action: 'streamProgress',
-          jobId,
-          ...job,
-          speed: job.totalBytes / ((Date.now() - job.startTime) / 1000),
-        }).catch(() => {});
-      },
-      onComplete: async (blob) => {
-        try {
-          const downloadId = await saveBlob(blob, finalFilename, tabId);
-          resolve({ downloadId, jobId });
-        } catch (err) {
-          reject(err);
-        }
-      },
-      onError: reject,
-    });
+  let audioParts = null;
+  const trackOf = (buffers, l) => ({
+    init: l.initIndex >= 0 ? buffers[l.initIndex] : null,
+    segments: buffers.slice(l.start, l.end).filter((_, i) => l.start + i !== l.initIndex),
+  });
+  const assemble = !audio ? null : (buffers) => {
+    if (mux) {
+      try {
+        return muxFragmentedMp4([trackOf(buffers, videoLayout), trackOf(buffers, audioLayout)]);
+      } catch (err) {
+        throw new Error(`Could not combine video and audio: ${err.message}`);
+      }
+    }
+    audioParts = buffers.slice(audioLayout.start, audioLayout.end).filter(Boolean);
+    return buffers.slice(videoLayout.start, videoLayout.end).filter(Boolean);
+  };
+
+  return runSegmentJob({
+    jobId,
+    segments,
+    outputExt: ext,
+    fetchers,
+    assemble,
+    onJobStarted,
+    meta: { sourceUrl, filename: finalFilename, kind: 'stream' },
+    save: async (blob) => {
+      const downloadId = await saveBlob(blob, finalFilename, tabId);
+      let audioDownloadId = null;
+      if (audioParts) {
+        const audioExt = hlsAudioExt(audio);
+        const audioName = finalFilename.replace(/\.\w+$/, ` (audio).${audioExt}`);
+        const audioBlob = new Blob(audioParts, { type: audioExt === 'm4a' ? 'audio/mp4' : 'application/octet-stream' });
+        audioParts = null;
+        audioDownloadId = await saveBlob(audioBlob, audioName, tabId);
+      }
+      return { downloadId, audioDownloadId, jobId, live: playlist.isLive };
+    },
   });
 }
 
 /**
  * Download a DASH stream: resolve MPD → fetch video + audio segments →
- * mux into a single MP4.
+ * mux into a single MP4. Multi-period presentations are stitched together
+ * with each period's decode times rebased onto one timeline.
  */
 async function downloadDashStream(opts) {
-  const { representationId, mpdUrl, authHeaders = {}, filename, tabId, jobId } = opts;
+  const {
+    representationId, mpdUrl, authHeaders = {}, authOrigin = null,
+    filename, tabId, jobId, sourceUrl = mpdUrl, onJobStarted,
+  } = opts;
 
   const frameId = frameIdForUrl(tabId, mpdUrl);
-  const fetchers = createFetcherSet(tabId, authHeaders, frameId);
+  const fetchers = createFetcherSet(tabId, authHeaders, frameId, authOrigin);
 
-  const body = await fetchTextWithStrategy(mpdUrl, 'manifest', { tabId, frameId, authHeaders });
+  const body = await fetchTextWithStrategy(mpdUrl, 'manifest', { tabId, frameId, authHeaders, authOrigin });
   const mpd = parseMpd(body, mpdUrl);
 
-  // Selected video rep (or best), plus the best audio rep when audio is separate.
+  // Selected video rep (or best), plus an audio rep when audio is separate:
+  // the browser's language, else the main role, else the best bitrate.
   // If an audio rep was explicitly selected, download just that.
   const pickedAudio = mpd.audio.find(r => r.id === representationId);
   const videoRep = pickedAudio
     ? null
     : (mpd.video.find(r => r.id === representationId) || mpd.video[0]);
-  const audioRep = pickedAudio || mpd.audio[0] || null;
-  const tracks = [videoRep, audioRep].filter(Boolean);
-  if (tracks.length === 0) throw new Error('No representation found');
-  if (tracks.some(r => r.hasDrm)) {
+  const audioRep = pickedAudio || pickAudioRepresentation(mpd.audio, uiLanguage());
+  const picks = [
+    videoRep && { rep: videoRep, kind: 'video' },
+    audioRep && { rep: audioRep, kind: 'audio' },
+  ].filter(Boolean);
+  if (picks.length === 0) throw new Error('No representation found');
+
+  const multiPeriod = mpd.periods.length > 1;
+  const tracks = picks.map(({ rep, kind }) => (multiPeriod
+    ? mpd.periods.map(p => matchRepresentation(rep, p[kind])).filter(Boolean)
+    : [rep]));
+  if (tracks.flat().some(r => r.hasDrm)) {
     throw new Error('This stream is DRM-protected and cannot be downloaded');
   }
 
   // One segment list for the whole job: [init?, ...media] per track.
   const segments = [];
-  const layout = tracks.map((rep) => {
-    const entry = { initIndex: -1, start: 0, end: 0 };
-    if (rep.initUrl) {
+  const initSpec = (url) => ({
+    ...withQueryFallback(url, mpdUrl), sequence: segments.length, key: null, required: true,
+  });
+  const layout = tracks.map((reps) => {
+    const entry = { initIndex: -1, start: 0, end: 0, offsets: [] };
+    if (reps[0].initUrl) {
       entry.initIndex = segments.length;
-      segments.push({
-        ...withQueryFallback(rep.initUrl, mpdUrl),
-        sequence: segments.length, key: null, required: true,
-      });
+      segments.push(initSpec(reps[0].initUrl));
     }
     entry.start = segments.length;
-    for (const url of rep.segmentUrls) {
-      segments.push({ ...withQueryFallback(url, mpdUrl), sequence: segments.length, key: null });
-    }
+    reps.forEach((rep, i) => {
+      // A later period with its own init: carried along (the muxer skips
+      // boxes that are not movie fragments) so its fragments stay aligned.
+      if (i > 0 && rep.initUrl && rep.initUrl !== reps[0].initUrl) {
+        segments.push(initSpec(rep.initUrl));
+        entry.offsets.push(0);
+      }
+      for (const url of rep.segmentUrls) {
+        segments.push({ ...withQueryFallback(url, mpdUrl), sequence: segments.length, key: null });
+        entry.offsets.push(rep.timeOffset || 0);
+      }
+    });
     entry.end = segments.length;
     return entry;
   });
@@ -665,63 +806,86 @@ async function downloadDashStream(opts) {
     ? filename.replace(/\.mp4$/i, `.${ext}`)
     : `video_${Date.now()}.${ext}`;
 
-  return new Promise((resolve, reject) => {
-    startSegmentDownload({
-      jobId,
-      segments,
-      initSegment: null,
-      outputExt: ext,
-      keyFetcher: fetchers.keyFetcher,
-      segmentFetcher: fetchers.segmentFetcher,
-      assemble: (buffers) => {
-        const trackData = layout.map(l => ({
-          init: l.initIndex >= 0 ? buffers[l.initIndex] : null,
-          segments: buffers.slice(l.start, l.end).filter(Boolean), // skipped segments
-        }));
-        if (trackData.length === 1) {
-          const [t] = trackData;
-          return [t.init, ...t.segments].filter(Boolean);
-        }
-        try {
-          return muxFragmentedMp4(trackData);
-        } catch (err) {
-          throw new Error(`Could not combine video and audio: ${err.message}`);
-        }
-      },
-      onProgress: (job) => {
-        chrome.runtime.sendMessage({
-          action: 'streamProgress',
-          jobId,
-          ...job,
-          speed: job.totalBytes / ((Date.now() - job.startTime) / 1000),
-        }).catch(() => {});
-      },
-      onComplete: async (blob) => {
-        try {
-          const downloadId = await saveBlob(blob, finalFilename, tabId);
-          resolve({ downloadId, jobId });
-        } catch (err) {
-          reject(err);
-        }
-      },
-      onError: reject,
-    });
+  return runSegmentJob({
+    jobId,
+    segments,
+    outputExt: ext,
+    fetchers,
+    onJobStarted,
+    meta: { sourceUrl, filename: finalFilename, kind: 'stream' },
+    assemble: (buffers) => {
+      const trackData = layout.map(l => ({
+        init: l.initIndex >= 0 ? buffers[l.initIndex] : null,
+        segments: buffers.slice(l.start, l.end), // null = skipped segment
+        timeOffsets: multiPeriod ? l.offsets : null,
+      }));
+      if (trackData.length === 1 && !multiPeriod) {
+        const [t] = trackData;
+        return [t.init, ...t.segments].filter(Boolean);
+      }
+      try {
+        return muxFragmentedMp4(trackData);
+      } catch (err) {
+        throw new Error(`Could not combine video and audio: ${err.message}`);
+      }
+    },
+    save: async (blob) => ({ downloadId: await saveBlob(blob, finalFilename, tabId), jobId }),
   });
 }
 
 // ── Message handler ─────────────────────────────────────────────────
 
+/**
+ * Only the extension's own pages (popup, options) may drive the worker.
+ * Content scripts run inside web pages, so a compromised page must not be
+ * able to start downloads or read auth context through them.
+ */
+function isTrustedSender(sender) {
+  return sender?.id === chrome.runtime.id && !sender.tab;
+}
+
 chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
-  handleMessage(msg, sender).then(sendResponse).catch((err) => {
+  if (!isTrustedSender(sender)) {
+    sendResponse({ error: 'Forbidden' });
+    return false;
+  }
+  handleMessage(msg).then(sendResponse).catch((err) => {
     sendResponse({ error: err.message });
   });
   return true; // async
 });
 
-async function handleMessage(msg, _sender) {
-  switch (msg.action) {
-    // ── Existing actions ──
+/** Source URLs whose download is being set up (manifest fetches in flight). */
+const reservedSources = new Set();
 
+function activeJobFor(sourceUrl) {
+  if (!sourceUrl) return null;
+  if (reservedSources.has(sourceUrl)) return { sourceUrl, state: 'starting' };
+  return [...listJobs(), ...listCompanionJobs()].find(j =>
+    j.sourceUrl === sourceUrl && (j.state === 'running' || j.state === 'paused')) || null;
+}
+
+/**
+ * Claim `sourceUrl` synchronously, before any await, so two concurrent
+ * requests cannot both pass the duplicate check. Released once the job is
+ * registered (or setup fails); the job itself then blocks duplicates.
+ */
+async function withReservedSource(sourceUrl, message, start) {
+  if (activeJobFor(sourceUrl)) throw new Error(message);
+  reservedSources.add(sourceUrl);
+  let released = false;
+  const release = () => {
+    if (!released) { released = true; reservedSources.delete(sourceUrl); }
+  };
+  try {
+    return await start(release);
+  } finally {
+    release();
+  }
+}
+
+async function handleMessage(msg) {
+  switch (msg.action) {
     case 'getNetworkVideos': {
       return videosWithCapturedTitles(msg.tabId);
     }
@@ -738,15 +902,12 @@ async function handleMessage(msg, _sender) {
     case 'download': {
       const ext = extFromUrl(msg.url) || extFromMime(msg.mime) || 'mp4';
       const filename = msg.filename || filenameFromUrl(msg.url, ext);
-      const downloadId = await startSimpleDownload(msg.url, filename, msg.tabId,
-        { keepExtension: !!msg.keepExtension });
+      const downloadId = await startSimpleDownload(msg.url, filename, msg.tabId);
       return { downloadId };
     }
 
     case 'expandHls': {
-      const authHeaders = msg.authHeaders || {};
-      const result = await expandHls(msg.url, authHeaders, msg.tabId || null);
-      return result;
+      return expandHls(msg.url, msg.authHeaders || {}, msg.tabId || null, msg.authOrigin || null);
     }
 
     case 'getDownloadState': {
@@ -760,41 +921,36 @@ async function handleMessage(msg, _sender) {
       return { states };
     }
 
-    // ── New iframe/stream actions ──
-
     case 'resolveIframe': {
-      return await resolveIframe(msg.url, msg.tabId);
+      return resolveIframe(msg.url, msg.tabId);
     }
 
     case 'expandDash': {
-      const authHeaders = msg.authHeaders || {};
-      const result = await expandDash(msg.url, authHeaders, msg.tabId || null);
-      return result;
+      return expandDash(msg.url, msg.authHeaders || {}, msg.tabId || null, msg.authOrigin || null);
     }
 
     case 'downloadStream': {
       const jobId = msg.jobId || `stream_${Date.now()}`;
-      const authHeaders = msg.authHeaders || {};
+      const sourceUrl = msg.sourceUrl || msg.url;
+      const common = {
+        authHeaders: msg.authHeaders || {},
+        authOrigin: msg.authOrigin || null,
+        filename: msg.filename,
+        tabId: msg.tabId,
+        jobId,
+        sourceUrl,
+      };
 
-      if (msg.streamType === 'dash') {
-        return await downloadDashStream({
-          representationId: msg.representationId,
-          mpdUrl: msg.url,
-          authHeaders,
-          filename: msg.filename,
-          tabId: msg.tabId,
-          jobId,
-        });
-      } else {
+      return withReservedSource(sourceUrl, 'This stream is already downloading', (release) => {
+        // Release the reservation once the segment job exists (it then
+        // blocks duplicates itself); the promise resolves only after saving.
+        const onJobStarted = release;
+        if (msg.streamType === 'dash') {
+          return downloadDashStream({ ...common, onJobStarted, representationId: msg.representationId, mpdUrl: msg.url });
+        }
         // Default to HLS
-        return await downloadHlsStream({
-          variantUrl: msg.url,
-          authHeaders,
-          filename: msg.filename,
-          tabId: msg.tabId,
-          jobId,
-        });
-      }
+        return downloadHlsStream({ ...common, onJobStarted, variantUrl: msg.url, masterUrl: msg.masterUrl || null });
+      });
     }
 
     case 'pauseStream': {
@@ -808,21 +964,45 @@ async function handleMessage(msg, _sender) {
     }
 
     case 'cancelStream': {
-      cancelDownload(msg.jobId);
+      if (!cancelCompanionDownload(msg.jobId)) cancelDownload(msg.jobId);
       return { ok: true };
     }
 
     case 'getStreamJobs': {
-      return { jobs: listJobs() };
+      return { jobs: [...listJobs().map(publicJob), ...listCompanionJobs()] };
     }
 
     case 'getStreamJobState': {
-      return { job: getJobState(msg.jobId) };
+      return { job: publicJob(getJobState(msg.jobId)) };
     }
 
-    case 'getAuthHeaders': {
-      const headers = await buildFullAuthHeaders(msg.url);
-      return { headers };
+    // ── YouTube via the optional companion app ──
+
+    case 'companionStatus': {
+      const settings = await companionSettings();
+      const probe = settings.enabled && settings.permitted
+        ? await probeCompanion()
+        : { available: false };
+      return { ...settings, ...probe };
+    }
+
+    case 'companionDownload': {
+      const jobId = msg.jobId || `yt_${Date.now()}`;
+      return withReservedSource(msg.url, 'This video is already downloading', async () => {
+        const { downloadPath, ytCookiesFromBrowser } = await chrome.storage.sync.get({
+          downloadPath: '', ytCookiesFromBrowser: false,
+        });
+        return startCompanionDownload({
+          jobId,
+          url: msg.url,
+          quality: msg.quality,
+          subfolder: downloadPath,
+          cookiesFromBrowser: ytCookiesFromBrowser,
+          onProgress: (job) => {
+            chrome.runtime.sendMessage({ action: 'streamProgress', ...job, jobId: job.id }).catch(() => {});
+          },
+        });
+      });
     }
 
     default:

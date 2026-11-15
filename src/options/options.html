@@ -14,16 +14,6 @@
     </div>
 
     <section>
-      <label for="defaultFormat">Default format preference</label>
-      <select id="defaultFormat">
-        <option value="">Auto (keep original)</option>
-        <option value="mp4">MP4</option>
-        <option value="webm">WebM</option>
-      </select>
-      <p class="hint">When set, downloaded files will use this extension.</p>
-    </section>
-
-    <section>
       <label for="defaultQuality">Preferred quality</label>
       <select id="defaultQuality">
         <option value="">Highest available</option>
@@ -32,7 +22,7 @@
         <option value="480">480p</option>
         <option value="360">360p</option>
       </select>
-      <p class="hint">For HLS/DASH streams with multiple qualities, auto-select this level.</p>
+      <p class="hint">For streams with multiple qualities, preselect the best one at or below this level.</p>
     </section>
 
     <section>
@@ -41,11 +31,35 @@
       <p class="hint">Relative to your default Chrome download directory. Leave blank for default.</p>
     </section>
 
-    <section class="checkbox-section">
-      <label>
-        <input id="showNotifications" type="checkbox">
-        Show notification on download complete
-      </label>
+    <section id="companion-section" class="companion-section" hidden>
+      <h2>YouTube (companion app)</h2>
+      <p class="hint">
+        YouTube downloads run through a small helper app on your computer that uses
+        <a href="https://github.com/yt-dlp/yt-dlp" target="_blank" rel="noopener">yt-dlp</a>.
+        Files are saved by the helper to your Downloads folder (plus the subfolder above),
+        not through Chrome. Only download videos you have the right to keep.
+      </p>
+      <div class="checkbox-section">
+        <label>
+          <input id="companionEnabled" type="checkbox">
+          Enable YouTube downloads via the companion app
+        </label>
+      </div>
+      <div class="checkbox-section">
+        <label>
+          <input id="ytCookiesFromBrowser" type="checkbox">
+          Let yt-dlp use your Chrome sign-in (for age-restricted or members-only videos)
+        </label>
+      </div>
+      <p class="hint">
+        Setup: install yt-dlp (and ffmpeg for 1080p and above), then from the companion download run
+        <code id="install-cmd">bash companion/install.sh EXTENSION_ID</code> on macOS/Linux, or on Windows
+        <code id="install-cmd-win">powershell -ExecutionPolicy Bypass -File companion\install.ps1 EXTENSION_ID</code>.
+      </p>
+      <div class="actions">
+        <button type="button" id="btn-test-companion" class="btn">Test connection</button>
+        <span id="companion-status" class="save-status"></span>
+      </div>
     </section>
 
     <div class="actions">

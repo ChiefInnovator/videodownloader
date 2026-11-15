@@ -21,14 +21,14 @@ Video Downloader is a free Chrome (Manifest V3) extension that finds the videos 
 
 ## Positioning
 
-- **Embedded work players.** Resolves cross-origin embeds from inside the embed frame, forwarding the user's session cookies and JWT tokens — so "if you're signed in and can watch it, it can usually save it." Vimeo, Wistia, JW Player, Mux, Cloudflare Stream, Vidyard, and Panopto resolve through each platform's own player API (`src/utils/platform-resolvers.js`); other embeds such as Brightcove, ON24, and Microsoft Medius fall back to manifests captured from network traffic, then to parsing the embed page's HTML.
+- **Embedded work players.** Resolves cross-origin embeds from inside the embed frame, using the user's own browser session and the embed's JWT tokens — so "if you're signed in and can watch it, it can usually save it." Vimeo, Wistia, JW Player, Mux, Cloudflare Stream, Vidyard, and Panopto resolve through each platform's own player API (`src/utils/platform-resolvers.js`); other embeds such as Brightcove, ON24, and Microsoft Medius fall back to manifests captured from network traffic, then to parsing the embed page's HTML.
 - **Zero telemetry.** No account, ads, analytics, or developer-owned server. Nothing leaves the browser except the fetches needed for the selected download. This is the product's core promise.
 
 ## Operating Context
 
 - Used from the browser toolbar popup on the page playing the video; embedded players need a **Resolve Stream** click.
 - Install is currently manual: download the release zip from GitHub Releases, `chrome://extensions` → Developer mode → **Load unpacked**.
-- Chromium browsers only (Chrome/Edge 114+, Brave, Arc, Vivaldi, Opera). Firefox and Safari unsupported. YouTube unsupported.
+- Chromium browsers only (Chrome/Edge 114+, Brave, Arc, Vivaldi, Opera). Firefox and Safari unsupported. YouTube only through the optional companion app (yt-dlp on the user's computer), not in the store build.
 - Marketing site: `docs/index.html` on GitHub Pages (`https://chiefinnovator.github.io/videodownloader/`), plus `docs/llms.txt` and structured data for search/answer engines.
 
 ## Capabilities and Constraints
@@ -44,7 +44,7 @@ Video Downloader is a free Chrome (Manifest V3) extension that finds the videos 
 - Name: **Video Downloader**. Tagline: "A video downloader that doesn't watch you back." / "A free video downloader that doesn't track what you are doing."
 - Built by **Rich Crane** — Microsoft MVP, Founder & Chief AI Officer at MILL5 — as part of the **Inventing Fire with AI** initiative (sibling projects: MacEdgeLight, Cut & Move).
 - Assets: `icons/icon128.png` (extension mark), `docs/images/inventing-fire-mark.png`, `docs/images/og-card.png`.
-- Voice: plain, direct, honest about limits (no YouTube, no DRM, manual install while the store listing is pending).
+- Voice: plain, direct, honest about limits (YouTube only via the optional companion, no DRM, manual install while the store listing is pending).
 
 ## Evidence on Hand
 
@@ -57,5 +57,5 @@ Video Downloader is a free Chrome (Manifest V3) extension that finds the videos 
 
 1. **Privacy is the product.** Never imply any data collection; every claim about what leaves the browser must stay literally true.
 2. **Serve both readers.** Lead with plain-language outcomes; keep precise technical truth one step away (FAQ, README, ARCHITECTURE.md), never diluted.
-3. **Honest about limits.** State unsupported cases (DRM, YouTube, Firefox/Safari, manual install) plainly instead of hiding them.
+3. **Honest about limits.** State unsupported cases (DRM, YouTube without the companion, Firefox/Safari, manual install) plainly instead of hiding them.
 4. **Legitimate use only.** Position around video the user is allowed to access and has a reason to keep.
