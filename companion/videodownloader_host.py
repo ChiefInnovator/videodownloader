@@ -200,7 +200,8 @@ def run_download(msg):
         return
 
     env = dict(os.environ, PATH=_search_path())
-    _cancelled = False
+    # _cancelled is reset by main() before this thread starts, so a Cancel
+    # that arrives while we are still preparing is not lost.
     code, final_file, errors = _run_ytdlp(cmd, env)
     note = ""
 
@@ -225,6 +226,8 @@ def run_download(msg):
 def _run_ytdlp(cmd, env):
     """Run yt-dlp, relaying progress. Returns (exit code, final file, stderr lines)."""
     global _proc
+    if _cancelled:
+        return -1, "", []
     try:
         _proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
                                  stdin=subprocess.DEVNULL, text=True, bufsize=1, env=env)
@@ -259,14 +262,17 @@ def _run_ytdlp(cmd, env):
 
 
 def cancel():
+    """Cancel the active download. The flag is set even between yt-dlp runs
+    (e.g. just before the cookie-less retry) so no new run starts after it."""
     global _cancelled
+    _cancelled = True
     proc = _proc
     if proc and proc.poll() is None:
-        _cancelled = True
         proc.terminate()
 
 
 def main():
+    global _cancelled
     worker = None
     while True:
         try:
@@ -288,10 +294,12 @@ def main():
             if worker and worker.is_alive():
                 send({"type": "error", "error": "A download is already running"})
                 continue
+            _cancelled = False
             worker = threading.Thread(target=run_download, args=(msg,), daemon=True)
             worker.start()
         elif kind == "cancel":
-            cancel()
+            if worker and worker.is_alive():
+                cancel()
         else:
             send({"type": "error", "error": f"Unknown message type: {kind}"})
     if worker:

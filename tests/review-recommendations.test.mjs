@@ -385,6 +385,11 @@ print('VDFILE ' + sys.argv[sys.argv.index('-P') + 1] + '/clip.mp4', flush=True)
   const fallback = await next(r => r.type === 'done');
   assert.match(fallback.note, /without them/);
 
+  // A Cancel with nothing running must not cancel the next download.
+  send({ type: 'cancel' });
+  send({ type: 'download', url: 'https://www.youtube.com/watch?v=jNQXAC9IVRw', subfolder: 'Videos' });
+  assert.equal((await next(r => r.type === 'done' || r.type === 'error')).type, 'done');
+
   send({ type: 'download', url: 'https://www.youtube.com/watch?v=SLOWSLOWSLO' });
   await new Promise(r => setTimeout(r, 300));
   send({ type: 'cancel' });
