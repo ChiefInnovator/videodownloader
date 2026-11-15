@@ -41,13 +41,14 @@ The current release is v2.4.4 (published 2026-11-02). It is distributed as a Chr
 - **Authentication forwarding** — fetches run with the browser's own cookies (`credentials: 'include'`, or inside the player frame). JWT tokens from an iframe URL are sent as a Bearer header only to that embed's host and its subdomains, never to third‑party CDNs. The extension has no `cookies` permission.
 - **Separate HLS audio** — `#EXT-X-MEDIA` audio renditions are muxed into the MP4 for fMP4/CMAF streams, or saved as a second audio file next to TS video.
 - **Multi‑period DASH** — periods (e.g. ad breaks, chapters) are stitched into one file with timestamps rebased; the audio track follows the browser language.
+- **SharePoint / OneDrive Stream** — offers the original MP4 as one file through SharePoint's own download link (respects download permissions) instead of listing the player's encrypted chunks.
 - **Live HLS** — marked LIVE in the popup; only the segments currently listed are saved.
-- **YouTube (optional companion app)** — a separate native‑messaging helper wraps yt‑dlp on the user's computer. Off by default, YouTube URLs only, not in the Chrome Web Store build. If Chrome's sign-in cookies can't be read, it retries once without them. The extension itself never extracts YouTube streams.
+- **Enhanced Downloader (optional)** — a separate native‑messaging helper wraps yt‑dlp on the user's computer. Off by default, YouTube URLs only, not in the Chrome Web Store build. If Chrome's sign-in cookies can't be read, it retries once without them. The extension itself never extracts YouTube streams.
 - **DRM detection** — surfaces Widevine, PlayReady, FairPlay (`skd://`), and Adobe Access markers in manifests and clearly warns the user. Does not attempt to bypass DRM.
 - **Segment‑level progress** — live readout of segment count, percent complete, throughput, and ETA. Pause, resume, and cancel at any time.
 - **SPA compatibility** — MutationObserver re‑scans the DOM when new video elements or iframes appear (React, Vue, Svelte, lazy‑loaded pages).
 - **Quality selection** — picks the preferred variant for multi‑bitrate HLS and multi‑representation DASH.
-- **Configurable options** — preferred quality, download subfolder, and the optional YouTube companion.
+- **Configurable options** — preferred quality, download subfolder, and the optional Enhanced Downloader.
 - **Privacy** — no analytics, no telemetry, no third‑party requests. Nothing leaves the browser except the segment fetches required to download the video you selected (with the companion, yt‑dlp on the same computer fetches the chosen YouTube video).
 
 ## Intended use cases

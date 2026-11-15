@@ -68,6 +68,7 @@
     scanMuxPlayers();
     scanYouTubeThumbnails();
     scanYouTubeWatchPage();
+    scanSharePointStream();
     scanIframes();
     scanComplianzBlockedVideos();
   }
@@ -223,6 +224,40 @@
    * plays from blob: URLs, so nothing else on the page is downloadable;
    * the popup offers it through the optional companion app.
    */
+  /**
+   * SharePoint / OneDrive Stream (…/_layouts/15/stream.aspx?id=<file path>)
+   * plays from per-chunk encrypted segments that can't be assembled. The
+   * file itself is a normal library item, so offer SharePoint's own
+   * download of the original — the same file as Stream's Download button,
+   * and refused by the server when the viewer lacks download rights.
+   */
+  function scanSharePointStream() {
+    if (window.top !== window) return;
+    const page = /^(.*)\/_layouts\/15\/stream\.aspx$/i.exec(location.pathname);
+    if (!page) return;
+    // The site (or nested subsite) is whatever precedes /_layouts/15/ on
+    // this page — '' for a root site — and the file must live under it.
+    const site = page[1]; // percent-encoded, as in location.pathname
+    let siteDecoded;
+    try { siteDecoded = decodeURIComponent(site); } catch { return; }
+    // `id` comes back decoded from URLSearchParams; compare like with like.
+    const id = new URLSearchParams(location.search).get('id');
+    if (!id || !id.toLowerCase().startsWith(`${siteDecoded.toLowerCase()}/`) || !VIDEO_EXT_RE.test(id)) return;
+    const url = `${location.origin}${site}/_layouts/15/download.aspx?SourceUrl=${encodeURIComponent(id)}`;
+    if (found.has(url)) return;
+    const file = id.split('/').pop();
+    found.set(url, {
+      url,
+      type: 'direct',
+      mime: guessMime(file),
+      width: null,
+      height: null,
+      duration: document.querySelector('video')?.duration || null,
+      poster: null,
+      title: file.replace(/\.\w+$/, ''),
+    });
+  }
+
   function scanYouTubeWatchPage() {
     if (window.top !== window) return;
     if (!/^(?:www\.|m\.)?youtube\.com$/i.test(location.hostname)) return;
@@ -239,7 +274,7 @@
       type: 'iframe-embed',
       platform: 'www.youtube.com',
       confidence: 'high',
-      title: document.title.replace(/\s*-\s*YouTube$/, '') || 'YouTube video',
+      title: document.title.replace(/\s*-\s*YouTube$/, '') || 'Video',
       width: null,
       height: null,
     });
