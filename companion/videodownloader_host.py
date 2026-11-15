@@ -36,7 +36,9 @@ MAX_MESSAGE = 1024 * 1024  # Chrome caps extension -> host messages at 4 GB; we 
 YOUTUBE_HOST_RE = re.compile(
     r"^(?:www\.|m\.|music\.)?(?:youtube\.com|youtube-nocookie\.com)$|^youtu\.be$", re.I)
 PROGRESS_PREFIX = "VDPROG "
-COOKIE_ERROR_RE = re.compile(r"cookies? database|could not copy .*cookie|cookie.*(keychain|decrypt)|failed to (load|read) cookies", re.I)
+COOKIE_ERROR_RE = re.compile(
+    r"cookies? database|could not copy .*cookie|cookie.*(keychain|decrypt)"
+    r"|(keychain|decrypt).*cookie|failed to (load|read) cookies", re.I)
 FILE_PREFIX = "VDFILE "
 # Chrome launches hosts with a minimal PATH; look in the usual install places too.
 EXTRA_PATHS = ["/opt/homebrew/bin", "/usr/local/bin", "/usr/bin",
