@@ -68,6 +68,7 @@
     scanMuxPlayers();
     scanYouTubeThumbnails();
     scanYouTubeWatchPage();
+    scanSharePointStream();
     scanIframes();
     scanComplianzBlockedVideos();
   }
@@ -223,6 +224,36 @@
    * plays from blob: URLs, so nothing else on the page is downloadable;
    * the popup offers it through the optional companion app.
    */
+  /**
+   * SharePoint / OneDrive Stream (…/_layouts/15/stream.aspx?id=<file path>)
+   * plays from per-chunk encrypted segments that can't be assembled. The
+   * file itself is a normal library item, so offer SharePoint's own
+   * download of the original — the same file as Stream's Download button,
+   * and refused by the server when the viewer lacks download rights.
+   */
+  function scanSharePointStream() {
+    if (window.top !== window) return;
+    if (!/\/_layouts\/15\/stream\.aspx$/i.test(location.pathname)) return;
+    const id = new URLSearchParams(location.search).get('id');
+    if (!id || !id.startsWith('/') || !VIDEO_EXT_RE.test(id)) return;
+    // Server-relative site: /teams/<name>, /sites/<name>, or /personal/<user>
+    const site = id.split('/').slice(0, 3).join('/');
+    if (!/^\/(teams|sites|personal)\/[^/]+$/i.test(site)) return;
+    const url = `${location.origin}${site}/_layouts/15/download.aspx?SourceUrl=${encodeURIComponent(id)}`;
+    if (found.has(url)) return;
+    const file = id.split('/').pop();
+    found.set(url, {
+      url,
+      type: 'direct',
+      mime: guessMime(file),
+      width: null,
+      height: null,
+      duration: document.querySelector('video')?.duration || null,
+      poster: null,
+      title: file.replace(/\.\w+$/, ''),
+    });
+  }
+
   function scanYouTubeWatchPage() {
     if (window.top !== window) return;
     if (!/^(?:www\.|m\.)?youtube\.com$/i.test(location.hostname)) return;
@@ -239,7 +270,7 @@
       type: 'iframe-embed',
       platform: 'www.youtube.com',
       confidence: 'high',
-      title: document.title.replace(/\s*-\s*YouTube$/, '') || 'YouTube video',
+      title: document.title.replace(/\s*-\s*YouTube$/, '') || 'Video',
       width: null,
       height: null,
     });

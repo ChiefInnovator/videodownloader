@@ -287,7 +287,7 @@ function nativePortDouble(script) {
 test('YouTube embeds do not resolve to manifests; companion downloads relay progress', async () => {
   const h = await harness();
   const resolved = await h.dispatch({ action: 'resolveIframe', tabId: 7, url: 'https://www.youtube.com/embed/jNQXAC9IVRw' });
-  assert.match(resolved.error, /companion/);
+  assert.match(resolved.error, /Enhanced Downloader/);
 
   // Off by default.
   const off = await h.dispatch({ action: 'companionDownload', url: 'https://youtu.be/jNQXAC9IVRw', quality: '720' });
@@ -311,7 +311,7 @@ test('YouTube embeds do not resolve to manifests; companion downloads relay prog
   assert.equal(status.available, true);
   assert.equal(status.ytdlp, '2026.10.26');
 
-  assert.match((await h.dispatch({ action: 'companionDownload', url: 'https://vimeo.com/1', quality: 'best' })).error, /YouTube/);
+  assert.match((await h.dispatch({ action: 'companionDownload', url: 'https://vimeo.com/1', quality: 'best' })).error, /does not support/);
 
   const result = await h.dispatch({ action: 'companionDownload', url: 'https://youtu.be/jNQXAC9IVRw', quality: '720', jobId: 'yt1' });
   assert.equal(result.file, '/Users/x/Downloads/Videos/clip.mp4');
@@ -426,4 +426,55 @@ test('store package drops nativeMessaging; release package keeps it and ships th
   const listing = execFileSync('unzip', ['-l', path.join(root, companionZip)]).toString();
   assert.match(listing, /companion\/videodownloader_host\.py/);
   assert.doesNotMatch(listing, /run_host/);
+});
+
+// ── SharePoint / OneDrive Stream ────────────────────────────────────
+
+test('Stream oneDrive.transcode chunks (query-identified segments) are not listed', async () => {
+  const h = await harness();
+  for (const part of ['initsegment', 'mediasegment']) {
+    for (const track of ['audio', 'video']) {
+      h.chrome.webRequest.onHeadersReceived.listeners[0]({
+        tabId: 7, frameId: 0,
+        url: `https://tenant.sharepoint.com/_api_cached/v2.1/drives/b!x/items/y/oneDrive.transcode?format=fmp4&part=${part}&track=${track}&segmentTime=7104000`,
+        responseHeaders: [{ name: 'content-type', value: 'video/mp4' }],
+      });
+    }
+  }
+  assert.equal((await h.dispatch({ action: 'getNetworkVideos', tabId: 7 })).videos.length, 0);
+});
+
+/** Run the real content script against a minimal page double. */
+async function runDetector(href) {
+  const vm = await import('node:vm');
+  const { readFile } = await import('node:fs/promises');
+  let listener;
+  const loc = new URL(href);
+  const win = {};
+  const context = vm.createContext({
+    URL, URLSearchParams, JSON, Node: { ELEMENT_NODE: 1 },
+    location: loc,
+    document: { title: 'Stream', documentElement: {}, querySelectorAll: () => [], querySelector: () => null },
+    MutationObserver: class { observe() {} },
+    chrome: { runtime: { onMessage: { addListener: (fn) => { listener = fn; } } } },
+  });
+  win.top = win;
+  context.window = win;
+  vm.runInContext(await readFile(path.join(root, 'src/content/detector.js'), 'utf8'), context);
+  return new Promise(resolve => listener({ action: 'getVideos' }, {}, resolve));
+}
+
+test('SharePoint stream.aspx offers the original file via download.aspx', async () => {
+  const id = '/teams/MVPAwardProgram118/Shared Documents/Recordings/2026.11.12 Product Pulse - November 2026.mp4';
+  const page = `https://tenant.sharepoint.com/teams/MVPAwardProgram118/_layouts/15/stream.aspx?id=${encodeURIComponent(id)}&share=abc`;
+  const { videos } = await runDetector(page);
+  assert.equal(videos.length, 1);
+  assert.equal(videos[0].url,
+    `https://tenant.sharepoint.com/teams/MVPAwardProgram118/_layouts/15/download.aspx?SourceUrl=${encodeURIComponent(id)}`);
+  assert.equal(videos[0].title, '2026.11.12 Product Pulse - November 2026');
+  assert.equal(videos[0].mime, 'video/mp4');
+
+  // Non-video items and unexpected paths are ignored.
+  assert.equal((await runDetector('https://tenant.sharepoint.com/teams/x/_layouts/15/stream.aspx?id=%2Fteams%2Fx%2Fdoc.pdf')).videos.length, 0);
+  assert.equal((await runDetector('https://tenant.sharepoint.com/teams/x/_layouts/15/stream.aspx?id=relative.mp4')).videos.length, 0);
 });

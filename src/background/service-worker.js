@@ -107,6 +107,9 @@ const DASH_MIME_RE = /dash\+xml/i;
 const SEGMENT_URL_RE = /\.(ts|m4s|m4v|m4a|m4i)(\?|#|$)/i;
 const KEY_URL_RE = /\.(key|bin)(\?|#|$)/i;
 const INIT_SEGMENT_RE = /\.(m4i|m4s|m4v|m4a)(\?|#|$)/i;
+// Segment requests identified by query rather than extension, e.g.
+// SharePoint/OneDrive Stream: …/oneDrive.transcode?part=mediasegment&segmentTime=…
+const SEGMENT_QUERY_RE = /[?&](?:part=(?:init|media)segment|segmentTime=|segmentNumber=)/i;
 
 /**
  * Filenames that indicate a sub-resource of a master manifest, not a
@@ -172,6 +175,7 @@ function recordNetworkVideo(details, contentType = '', contentLength = null, cap
 
   // Skip individual segments, init segments, keys, and sub-resource playlists
   if (SEGMENT_URL_RE.test(path) || KEY_URL_RE.test(path)) return;
+  if (SEGMENT_QUERY_RE.test(details.url)) return;
   if (INIT_SEGMENT_RE.test(path)) return;
   if (SUB_RESOURCE_NAMES.test(path)) return;
 
@@ -508,7 +512,7 @@ async function resolveIframe(iframeUrl, tabId) {
 
   // YouTube has no manifest to resolve; it goes through the companion app.
   if (isYouTubeUrl(iframeUrl)) {
-    return { manifests: [], authHeaders, authOrigin, error: 'YouTube needs the companion app (see Settings)' };
+    return { manifests: [], authHeaders, authOrigin, error: 'Needs Enhanced Downloader (see Settings)' };
   }
 
   // Strategy 0: known platform (Vimeo, Wistia, JW Player, Mux, Cloudflare
