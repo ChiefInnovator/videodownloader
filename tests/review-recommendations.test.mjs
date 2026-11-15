@@ -480,6 +480,12 @@ test('SharePoint stream.aspx offers the original file via download.aspx', async 
   assert.equal(nested.videos[0].url,
     `https://tenant.sharepoint.com/teams/parent/subsite/_layouts/15/download.aspx?SourceUrl=${encodeURIComponent(nestedId)}`);
 
+  // Sites with encoded characters in their path ("My Team") still match.
+  const spacedId = '/teams/My Team/Shared Documents/clip.mp4';
+  const spaced = await runDetector(`https://tenant.sharepoint.com/teams/My%20Team/_layouts/15/stream.aspx?id=${encodeURIComponent(spacedId)}`);
+  assert.equal(spaced.videos[0].url,
+    `https://tenant.sharepoint.com/teams/My%20Team/_layouts/15/download.aspx?SourceUrl=${encodeURIComponent(spacedId)}`);
+
   // Non-video items, ids outside this site, and unexpected paths are ignored.
   assert.equal((await runDetector(`https://tenant.sharepoint.com/teams/other/_layouts/15/stream.aspx?id=${encodeURIComponent(id)}`)).videos.length, 0);
   assert.equal((await runDetector('https://tenant.sharepoint.com/teams/x/_layouts/15/stream.aspx?id=%2Fteams%2Fx%2Fdoc.pdf')).videos.length, 0);

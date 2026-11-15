@@ -237,9 +237,12 @@
     if (!page) return;
     // The site (or nested subsite) is whatever precedes /_layouts/15/ on
     // this page — '' for a root site — and the file must live under it.
-    const site = page[1];
+    const site = page[1]; // percent-encoded, as in location.pathname
+    let siteDecoded;
+    try { siteDecoded = decodeURIComponent(site); } catch { return; }
+    // `id` comes back decoded from URLSearchParams; compare like with like.
     const id = new URLSearchParams(location.search).get('id');
-    if (!id || !id.toLowerCase().startsWith(`${site.toLowerCase()}/`) || !VIDEO_EXT_RE.test(id)) return;
+    if (!id || !id.toLowerCase().startsWith(`${siteDecoded.toLowerCase()}/`) || !VIDEO_EXT_RE.test(id)) return;
     const url = `${location.origin}${site}/_layouts/15/download.aspx?SourceUrl=${encodeURIComponent(id)}`;
     if (found.has(url)) return;
     const file = id.split('/').pop();
