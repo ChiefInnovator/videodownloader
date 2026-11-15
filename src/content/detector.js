@@ -22,7 +22,7 @@
   /** @type {Map<string, IframeInfo>} iframe src → info */
   const foundIframes = new Map();
 
-  // ── Known video embed patterns (must stay in sync with iframe-resolver) ─
+  // ── Known video embed patterns (the only copy; the worker does not classify) ─
 
   const KNOWN_VIDEO_DOMAINS = [
     /^www\.youtube\.com$/i,
@@ -30,7 +30,6 @@
     /medius\.microsoft\.com$/i,
     /microsoftstream\.com$/i,
     /web\.microsoftstream\.com$/i,
-    /microsoft\.com.*\/video/i,         // any microsoft.com subdomain with /video path
     /\.sharepoint\.com$/i,              // SharePoint-hosted videos
     /player\.vimeo\.com$/i,
     /stream\.mux\.com$/i,
@@ -45,6 +44,8 @@
     /kaltura\.com$/i,
     /cloudfront\.net$/i,
     /akamaihd\.net$/i,
+    /akamaized\.net$/i,
+    /(^|\.)on24\.com$/i,
     /cdn\.embedly\.com$/i,
     /embed\.api\.video$/i,
     /iframe\.mediadelivery\.net$/i,
@@ -66,6 +67,7 @@
     scanInlinePlayerConfigs();
     scanMuxPlayers();
     scanYouTubeThumbnails();
+    scanYouTubeWatchPage();
     scanIframes();
     scanComplianzBlockedVideos();
   }
@@ -214,6 +216,33 @@
         });
       } catch { /* skip malformed URLs */ }
     }
+  }
+
+  /**
+   * On youtube.com itself, surface the video being watched. Its player
+   * plays from blob: URLs, so nothing else on the page is downloadable;
+   * the popup offers it through the optional companion app.
+   */
+  function scanYouTubeWatchPage() {
+    if (window.top !== window) return;
+    if (!/^(?:www\.|m\.)?youtube\.com$/i.test(location.hostname)) return;
+    const id = new URLSearchParams(location.search).get('v')
+      || /^\/(?:shorts|live)\/([\w-]{11})/.exec(location.pathname)?.[1];
+    if (!id || !/^[\w-]{11}$/.test(id)) return;
+    const url = `https://www.youtube.com/watch?v=${id}`;
+    // SPA navigation keeps this content script alive; drop the previous video.
+    for (const key of foundIframes.keys()) {
+      if (key.startsWith('https://www.youtube.com/watch?v=') && key !== url) foundIframes.delete(key);
+    }
+    foundIframes.set(url, {
+      url,
+      type: 'iframe-embed',
+      platform: 'www.youtube.com',
+      confidence: 'high',
+      title: document.title.replace(/\s*-\s*YouTube$/, '') || 'YouTube video',
+      width: null,
+      height: null,
+    });
   }
 
   /**

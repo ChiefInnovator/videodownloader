@@ -6,8 +6,11 @@
  * Strategies (tried in order):
  *   1. page-main-world  — fetch() injected into page's JS context (page's CORS + cookies)
  *   2. content-script    — fetch() in content script isolated world (page cookies, extension CORS)
- *   3. sw-cookies        — fetch() in service worker with manually-built Cookie header
- *   4. direct-fetch      — plain fetch() with credentials: include from service worker
+ *   3. direct-fetch      — fetch() with credentials: include from the service worker
+ *
+ * There is no "build a Cookie header" strategy: Cookie is a forbidden
+ * request header, so fetch() silently drops it. credentials: 'include'
+ * already sends the browser's own cookies for hosts we have access to.
  *
  * Segments try direct-fetch first (see SEGMENT_ORDER): CDN segment URLs are
  * usually signed, and a service-worker fetch avoids copying every byte
@@ -16,30 +19,37 @@
  * Inventing Fire with AI — by Rich Crane
  */
 
-// ── Cookie helper (extracted from service-worker) ───────────────────
+// ── Auth scoping ────────────────────────────────────────────────────
 
 /**
- * Get cookies for a given URL's domain via chrome.cookies API.
- * Tries exact origin, hostname, then parent domain.
+ * Registrable-domain approximation without a public-suffix list: the last
+ * two labels, or three when the second-level label is a short country
+ * SLD ("co.uk", "com.au").
  */
-export async function getCookiesForUrl(url) {
+function siteOf(hostname) {
+  const labels = hostname.toLowerCase().split('.');
+  if (labels.length <= 2) return labels.join('.');
+  const take = labels.at(-1).length === 2 && labels.at(-2).length <= 3 ? 3 : 2;
+  return labels.slice(-take).join('.');
+}
+
+/** True when `url` is on the same site as `origin`. */
+export function sameSite(url, origin) {
   try {
-    const parsed = new URL(url);
-    let cookies = await chrome.cookies.getAll({ url: parsed.origin });
-    if (cookies.length === 0) {
-      cookies = await chrome.cookies.getAll({ domain: parsed.hostname });
-    }
-    if (cookies.length === 0) {
-      const parts = parsed.hostname.split('.');
-      if (parts.length > 2) {
-        const parentDomain = '.' + parts.slice(-2).join('.');
-        cookies = await chrome.cookies.getAll({ domain: parentDomain });
-      }
-    }
-    return cookies;
+    return siteOf(new URL(url).hostname) === siteOf(new URL(origin).hostname);
   } catch {
-    return [];
+    return false;
   }
+}
+
+/**
+ * Embed-derived headers (a Bearer token from the iframe URL) only go back
+ * to the site that issued them — never to third-party CDNs or key servers.
+ */
+function authHeadersFor(url, ctx) {
+  const headers = ctx.authHeaders || {};
+  if (!ctx.authOrigin || !Object.keys(headers).length) return {};
+  return sameSite(url, ctx.authOrigin) ? headers : {};
 }
 
 // ── Strategy definitions ────────────────────────────────────────────
@@ -106,28 +116,11 @@ const STRATEGIES = [
     },
   },
   {
-    name: 'sw-cookies',
-    available: () => true,
-    execute: async (url, ctx) => {
-      const headers = { ...(ctx.authHeaders || {}) };
-      if (ctx.range) headers.Range = ctx.range;
-      if (!headers.Cookie) {
-        const cookies = await getCookiesForUrl(url);
-        if (cookies.length) {
-          headers.Cookie = cookies.map(c => `${c.name}=${c.value}`).join('; ');
-        }
-      }
-      const res = await fetch(url, { headers, signal: ctx.signal });
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      return res.arrayBuffer();
-    },
-  },
-  {
     name: 'direct-fetch',
     available: () => true,
     execute: async (url, ctx) => {
       const res = await fetch(url, {
-        headers: ctx.range ? { ...(ctx.authHeaders || {}), Range: ctx.range } : (ctx.authHeaders || {}),
+        headers: ctx.range ? { ...authHeadersFor(url, ctx), Range: ctx.range } : authHeadersFor(url, ctx),
         credentials: 'include',
         signal: ctx.signal,
       });
@@ -140,7 +133,7 @@ const STRATEGIES = [
 // Segment fetches are the bulk of a download. Try the zero-copy service
 // worker fetch first; if the CDN rejects it, the in-page strategies follow
 // and the winner is cached per domain like any other operation.
-const SEGMENT_ORDER = ['direct-fetch', 'page-main-world', 'content-script', 'sw-cookies'];
+const SEGMENT_ORDER = ['direct-fetch', 'page-main-world', 'content-script'];
 
 function strategiesFor(operationType) {
   if (operationType !== 'segment') return STRATEGIES;
@@ -155,20 +148,6 @@ function cacheKey(domain, opType) {
   return `${domain}:${opType}`;
 }
 
-/**
- * Clear cached strategies. Call when auth state changes.
- * @param {string} [domain] — specific domain, or omit to clear all
- */
-export function clearCache(domain) {
-  if (domain) {
-    for (const key of cache.keys()) {
-      if (key.startsWith(domain + ':')) cache.delete(key);
-    }
-  } else {
-    cache.clear();
-  }
-}
-
 // ── Core fetch function ─────────────────────────────────────────────
 
 /**
@@ -177,7 +156,7 @@ export function clearCache(domain) {
  *
  * @param {string} url
  * @param {'manifest'|'key'|'segment'} operationType
- * @param {{ tabId: number|null, frameId?: number|null, authHeaders?: HeadersInit, signal?: AbortSignal, range?: string|null }} context
+ * @param {{ tabId: number|null, frameId?: number|null, authHeaders?: Record<string,string>, authOrigin?: string|null, signal?: AbortSignal, range?: string|null }} context
  * @returns {Promise<ArrayBuffer>}
  */
 export async function fetchWithStrategy(url, operationType, context) {
@@ -237,12 +216,13 @@ export async function fetchTextWithStrategy(url, operationType, context) {
  * Pass these directly into startSegmentDownload().
  *
  * @param {number|null} tabId
- * @param {HeadersInit} [authHeaders={}]
+ * @param {Record<string,string>} [authHeaders={}]
  * @param {number|null} [frameId=null] — frame to fetch from (cross-origin iframes)
+ * @param {string|null} [authOrigin=null] — site the auth headers belong to
  * @returns {{ manifestFetcher, keyFetcher, segmentFetcher }}
  */
-export function createFetcherSet(tabId, authHeaders = {}, frameId = null) {
-  const ctx = { tabId, frameId, authHeaders };
+export function createFetcherSet(tabId, authHeaders = {}, frameId = null, authOrigin = null) {
+  const ctx = { tabId, frameId, authHeaders, authOrigin };
 
   return {
     manifestFetcher: (url) => fetchWithStrategy(url, 'manifest', ctx),
@@ -250,24 +230,6 @@ export function createFetcherSet(tabId, authHeaders = {}, frameId = null) {
     segmentFetcher: (url, range = null) =>
       fetchWithStrategy(url, 'segment', range ? { ...ctx, range } : ctx),
   };
-}
-
-// ── Probe (optional explicit pre-test) ──────────────────────────────
-
-/**
- * Pre-test which strategy works for a domain + operation type.
- * Returns the winning strategy name. The result is cached.
- *
- * @param {string} sampleUrl — a URL on the target domain to test
- * @param {'manifest'|'key'|'segment'} operationType
- * @param {{ tabId: number|null, authHeaders?: HeadersInit }} context
- * @returns {Promise<string>} — winning strategy name
- */
-export async function probe(sampleUrl, operationType, context) {
-  // fetchWithStrategy already probes and caches — just discard the data
-  await fetchWithStrategy(sampleUrl, operationType, context);
-  const domain = new URL(sampleUrl).hostname;
-  return cache.get(cacheKey(domain, operationType)) || 'unknown';
 }
 
 // ── Internal helpers ────────────────────────────────────────────────

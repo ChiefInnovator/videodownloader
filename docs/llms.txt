@@ -38,13 +38,17 @@ The current release is v2.4.4 (published 2026-11-02). It is distributed as a Chr
 - **Player‑config detection** — finds media in JW Player, Video.js, and Flowplayer setup code, Next.js and Nuxt page data, `<mux-player>` elements, JSON‑LD `embedUrl`, and `twitter:player:stream` cards.
 - **Audio only and copy link** — DASH streams with a separate audio track offer an "Audio only (.m4a)" choice (the original AAC track, no re‑encoding). Every detected video has a **Copy link** button for pasting its direct or manifest URL into a player such as VLC.
 - **Session‑titled files and slides** — each network video's session/player title is captured when detected, so later playback on the same page keeps earlier names intact. Historical streams without a captured title use their URL filename. Linked slide decks (PDF, PPT, Key) are listed and saved alongside the video.
-- **Authentication forwarding** — extracts JWT tokens from iframe URL query parameters and pulls session cookies via `chrome.cookies.getAll()`. Applied to all manifest, segment, and key requests.
+- **Authentication forwarding** — fetches run with the browser's own cookies (`credentials: 'include'`, or inside the player frame). JWT tokens from an iframe URL are sent as a Bearer header only to that embed's own site, never to third‑party CDNs. The extension has no `cookies` permission.
+- **Separate HLS audio** — `#EXT-X-MEDIA` audio renditions are muxed into the MP4 for fMP4/CMAF streams, or saved as a second audio file next to TS video.
+- **Multi‑period DASH** — periods (e.g. ad breaks, chapters) are stitched into one file with timestamps rebased; the audio track follows the browser language.
+- **Live HLS** — marked LIVE in the popup; only the segments currently listed are saved.
+- **YouTube (optional companion app)** — a separate native‑messaging helper wraps yt‑dlp on the user's computer. Off by default, YouTube URLs only, not in the Chrome Web Store build. The extension itself never extracts YouTube streams.
 - **DRM detection** — surfaces Widevine, PlayReady, FairPlay (`skd://`), and Adobe Access markers in manifests and clearly warns the user. Does not attempt to bypass DRM.
 - **Segment‑level progress** — live readout of segment count, percent complete, throughput, and ETA. Pause, resume, and cancel at any time.
 - **SPA compatibility** — MutationObserver re‑scans the DOM when new video elements or iframes appear (React, Vue, Svelte, lazy‑loaded pages).
 - **Quality selection** — picks the preferred variant for multi‑bitrate HLS and multi‑representation DASH.
-- **Configurable options** — default format, default quality, download location.
-- **Privacy** — no analytics, no telemetry, no third‑party requests. Nothing leaves the browser except the segment fetches required to download the video you selected.
+- **Configurable options** — preferred quality, download subfolder, and the optional YouTube companion.
+- **Privacy** — no analytics, no telemetry, no third‑party requests. Nothing leaves the browser except the segment fetches required to download the video you selected (with the companion, yt‑dlp on the same computer fetches the chosen YouTube video).
 
 ## Intended use cases
 

@@ -162,10 +162,12 @@ function patchTrak(trak, trackId, scale) {
  * Pull every moof (+ the boxes up to and including its mdat) out of the
  * media segments, renumbering tfhd track IDs.
  */
-function collectFragments(segments, trackId, mediaTimescale) {
+function collectFragments(segments, trackId, mediaTimescale, timeOffsets = null) {
   const frags = [];
 
-  for (const seg of segments) {
+  for (let s = 0; s < segments.length; s++) {
+    const seg = segments[s];
+    const shift = Math.round((timeOffsets?.[s] || 0) * mediaTimescale);
     const top = readBoxes(seg);
     for (let i = 0; i < top.length; i++) {
       if (top[i].type !== 'moof') continue;
@@ -188,7 +190,7 @@ function collectFragments(segments, trackId, mediaTimescale) {
         absOffsets: [],
         mfhdSeqPos: -1,
       };
-      patchMoof(frag, trackId, mediaTimescale);
+      patchMoof(frag, trackId, mediaTimescale, shift);
       frags.push(frag);
       i = j - 1;
     }
@@ -200,7 +202,7 @@ function collectFragments(segments, trackId, mediaTimescale) {
   return frags;
 }
 
-function patchMoof(frag, trackId, mediaTimescale) {
+function patchMoof(frag, trackId, mediaTimescale, shift = 0) {
   const { moof } = frag;
   const dv = view(moof);
   const root = { start: 0, end: moof.byteLength, header: 8 };
@@ -218,11 +220,17 @@ function patchMoof(frag, trackId, mediaTimescale) {
             // base-data-offset-present: absolute offset, must be rebased on output
             frag.absOffsets.push({ pos: body + 8, value: Number(dv.getBigUint64(body + 8)) });
           }
-        } else if (t.type === 'tfdt' && frag.time === null) {
-          const decode = moof[body] === 1
-            ? Number(dv.getBigUint64(body + 4))
-            : dv.getUint32(body + 4);
-          frag.time = decode / mediaTimescale;
+        } else if (t.type === 'tfdt') {
+          const v1 = moof[body] === 1;
+          let decode = v1 ? Number(dv.getBigUint64(body + 4)) : dv.getUint32(body + 4);
+          if (shift) {
+            // Rebase onto the whole-presentation timeline (multi-period DASH).
+            decode = Math.max(0, decode + shift);
+            if (v1) dv.setBigUint64(body + 4, BigInt(decode));
+            else if (decode <= 0xffffffff) dv.setUint32(body + 4, decode);
+            else throw new Error('Decode time exceeds 32-bit tfdt');
+          }
+          if (frag.time === null) frag.time = decode / mediaTimescale;
         }
       }
     }
@@ -252,9 +260,12 @@ function interleave(lists) {
 /**
  * Mux separate fMP4 tracks into one fragmented MP4.
  *
- * @param {{ init: ArrayBuffer|Uint8Array|null, segments: (ArrayBuffer|Uint8Array)[] }[]} tracks
+ * @param {{ init: ArrayBuffer|Uint8Array|null, segments: (ArrayBuffer|Uint8Array|null)[],
+ *            timeOffsets?: number[] }[]} tracks
  *   — one entry per track (e.g. [video, audio]). If `init` is null the
  *   first segment must contain the moov (DASH SegmentBase single-file).
+ *   `timeOffsets[i]` (seconds) is added to segment i's decode times;
+ *   null entries in `segments` (skipped downloads) are ignored.
  * @returns {Uint8Array[]} parts to pass to `new Blob(parts, { type: 'video/mp4' })`
  */
 export function muxFragmentedMp4(tracks) {
@@ -262,11 +273,13 @@ export function muxFragmentedMp4(tracks) {
 
   const toU8 = (b) => (b instanceof Uint8Array ? b : new Uint8Array(b));
 
-  const parsed = tracks.map(({ init, segments }) => {
-    const segs = segments.filter(Boolean).map(toU8);
+  const parsed = tracks.map(({ init, segments, timeOffsets = null }) => {
+    const kept = segments.map((seg, i) => [seg, timeOffsets?.[i] || 0]).filter(([seg]) => seg);
+    const segs = kept.map(([seg]) => toU8(seg));
+    const offsets = kept.map(([, off]) => off);
     const initU8 = init ? toU8(init) : segs[0];
     if (!initU8) throw new Error('Track has no init segment or media');
-    return { info: parseInit(initU8), segs };
+    return { info: parseInit(initU8), segs, offsets };
   });
 
   const movieTimescale = parsed[0].info.movieTimescale;
@@ -275,7 +288,7 @@ export function muxFragmentedMp4(tracks) {
   const trexes = [];
   const fragLists = [];
 
-  parsed.forEach(({ info, segs }, i) => {
+  parsed.forEach(({ info, segs, offsets }, i) => {
     const trackId = i + 1;
     patchTrak(info.trak, trackId, movieTimescale / info.movieTimescale);
     traks.push(info.trak);
@@ -287,7 +300,7 @@ export function muxFragmentedMp4(tracks) {
       trexes.push(makeBox('trex', u32(0, trackId, 1, 0, 0, 0)));
     }
 
-    fragLists.push(collectFragments(segs, trackId, info.mediaTimescale));
+    fragLists.push(collectFragments(segs, trackId, info.mediaTimescale, offsets));
   });
 
   // mvhd from the first track, next_track_ID (last field) updated

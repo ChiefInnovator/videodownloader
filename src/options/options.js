@@ -3,10 +3,10 @@
  */
 
 const DEFAULTS = {
-  defaultFormat: '',
   defaultQuality: '',
   downloadPath: '',
-  showNotifications: true,
+  companionEnabled: false,
+  ytCookiesFromBrowser: false,
 };
 
 const ids = Object.keys(DEFAULTS);
@@ -40,8 +40,59 @@ function save() {
   });
 }
 
+// ── Companion app (YouTube via yt-dlp) ──────────────────────────────
+// Only offered when this build declares the optional nativeMessaging
+// permission (store builds strip it — see scripts/package.sh --store).
+
+function companionSupported() {
+  return (chrome.runtime.getManifest().optional_permissions || []).includes('nativeMessaging');
+}
+
+function setCompanionStatus(text) {
+  document.getElementById('companion-status').textContent = text;
+}
+
+async function onCompanionToggle(event) {
+  const box = event.target;
+  if (!box.checked) {
+    await chrome.storage.sync.set({ companionEnabled: false });
+    chrome.permissions.remove({ permissions: ['nativeMessaging'] }).catch(() => {});
+    setCompanionStatus('Turned off');
+    return;
+  }
+  // Must run inside the click (user gesture) to show Chrome's prompt.
+  let granted = false;
+  try {
+    granted = await chrome.permissions.request({ permissions: ['nativeMessaging'] });
+  } catch (err) {
+    setCompanionStatus(err.message);
+  }
+  box.checked = granted;
+  await chrome.storage.sync.set({ companionEnabled: granted });
+  setCompanionStatus(granted ? 'Enabled — click Test connection' : 'Permission not granted');
+}
+
+async function testCompanion() {
+  setCompanionStatus('Checking…');
+  const status = await chrome.runtime.sendMessage({ action: 'companionStatus' }).catch(err => ({ error: err.message }));
+  if (status?.available) {
+    setCompanionStatus(`Connected — yt-dlp ${status.ytdlp}${status.ffmpeg ? ', ffmpeg found' : ', no ffmpeg (max 720p)'}`);
+  } else {
+    setCompanionStatus(status?.error || 'Not connected');
+  }
+}
+
+function initCompanion() {
+  if (!companionSupported()) return;
+  document.getElementById('companion-section').hidden = false;
+  document.getElementById('install-cmd').textContent = `companion/install.sh ${chrome.runtime.id}`;
+  document.getElementById('companionEnabled').addEventListener('change', onCompanionToggle);
+  document.getElementById('btn-test-companion').addEventListener('click', testCompanion);
+}
+
 document.addEventListener('DOMContentLoaded', () => {
   load();
+  initCompanion();
   const ver = document.getElementById('version');
   if (ver) ver.textContent = 'v' + chrome.runtime.getManifest().version;
 });

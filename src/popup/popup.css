@@ -216,6 +216,12 @@ main {
   color: var(--success);
 }
 
+.video-meta .badge-live,
+.video-meta .badge-youtube {
+  background: rgba(231, 76, 60, 0.15);
+  color: var(--danger);
+}
+
 /* ── Actions row ──────────────────────────────────────────────────── */
 
 .video-actions {

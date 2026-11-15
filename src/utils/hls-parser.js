@@ -13,6 +13,15 @@
  * @property {number|null} height
  * @property {string}      codecs
  * @property {string}      label      — human-readable quality string
+ * @property {string|null} audioGroup — EXT-X-MEDIA audio GROUP-ID, or null
+ */
+
+/**
+ * @typedef {Object} HlsAudioRendition
+ * @property {string}      url
+ * @property {string}      name
+ * @property {string}      language
+ * @property {boolean}     isDefault
  */
 
 /**
@@ -90,13 +99,54 @@ export function parseMasterPlaylist(body, baseUrl) {
         height = h || null;
       }
       const label = height ? `${height}p` : `${Math.round(bandwidth / 1000)}k`;
-      variants.push({ url, bandwidth, width, height, codecs, label });
+      variants.push({ url, bandwidth, width, height, codecs, label, audioGroup: pendingAttrs.AUDIO || null });
       pendingAttrs = null;
     }
   }
 
   variants.sort((a, b) => b.bandwidth - a.bandwidth);
   return variants;
+}
+
+/**
+ * Separate audio renditions (EXT-X-MEDIA TYPE=AUDIO with a URI), grouped
+ * by GROUP-ID. Renditions without a URI are muxed into the variant.
+ *
+ * @param {string} body
+ * @param {string} baseUrl
+ * @returns {Record<string, HlsAudioRendition[]>}
+ */
+export function parseAudioRenditions(body, baseUrl) {
+  const groups = {};
+  for (const line of body.split(/\r?\n/)) {
+    const trimmed = line.trim();
+    if (!trimmed.startsWith('#EXT-X-MEDIA:')) continue;
+    const attrs = parseAttributes(trimmed.substring('#EXT-X-MEDIA:'.length));
+    if (attrs.TYPE !== 'AUDIO' || !attrs.URI || !attrs['GROUP-ID']) continue;
+    (groups[attrs['GROUP-ID']] ||= []).push({
+      url: resolveUrl(attrs.URI, baseUrl),
+      name: attrs.NAME || '',
+      language: attrs.LANGUAGE || '',
+      isDefault: attrs.DEFAULT === 'YES',
+    });
+  }
+  return groups;
+}
+
+/**
+ * Choose one audio rendition: the browser's language, then DEFAULT=YES,
+ * then the first listed.
+ *
+ * @param {HlsAudioRendition[]} renditions
+ * @param {string} [uiLanguage]
+ * @returns {HlsAudioRendition|null}
+ */
+export function pickAudioRendition(renditions, uiLanguage = '') {
+  if (!renditions?.length) return null;
+  const lang = uiLanguage.toLowerCase().split('-')[0];
+  return (lang && renditions.find(r => r.language.toLowerCase().split('-')[0] === lang))
+    || renditions.find(r => r.isDefault)
+    || renditions[0];
 }
 
 // ── Media playlist (with AES-128 support) ───────────────────────────
@@ -233,21 +283,6 @@ export function parseMediaPlaylistDetailed(body, baseUrl) {
   };
 }
 
-/**
- * Simple segment-URL-only parse (backward compat).
- *
- * @param {string} body
- * @param {string} baseUrl
- * @returns {string[]}
- */
-export function parseMediaPlaylist(body, baseUrl) {
-  return body
-    .split(/\r?\n/)
-    .map(l => l.trim())
-    .filter(l => l && !l.startsWith('#'))
-    .map(l => resolveUrl(l, baseUrl));
-}
-
 // ── Detection helpers ───────────────────────────────────────────────
 
 /** Detect whether the text looks like an HLS playlist. */
@@ -263,14 +298,6 @@ export function isMasterPlaylist(text) {
 /** Detect whether the playlist uses AES-128 encryption. */
 export function isAesEncrypted(text) {
   return typeof text === 'string' && /EXT-X-KEY.*METHOD=AES-128/i.test(text);
-}
-
-/** Detect whether the playlist uses SAMPLE-AES or other DRM. */
-export function hasDrmEncryption(text) {
-  if (typeof text !== 'string') return false;
-  return /EXT-X-(?:SESSION-)?KEY.*METHOD=SAMPLE-AES/i.test(text)
-    || DRM_KEY_RE.test(text)
-    || text.includes('#EXT-X-FAXS-CM:');
 }
 
 // ── Internal helpers ────────────────────────────────────────────────

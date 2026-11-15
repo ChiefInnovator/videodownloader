@@ -22,14 +22,32 @@ import { parseXml, child, children, descendants } from './xml-lite.js';
  * @property {string|null} initUrl     — initialization segment URL
  * @property {string[]}    segmentUrls — ordered list of media segment URLs
  * @property {boolean}     hasDrm      — whether ContentProtection elements are present
+ * @property {string}      lang        — AdaptationSet@lang ('' if absent)
+ * @property {string}      role        — AdaptationSet Role@value ('' if absent)
+ * @property {number}      periodIndex
+ * @property {number}      timeOffset  — seconds to add to decode times (multi-period)
+ */
+
+/**
+ * @typedef {Object} DashPeriod
+ * @property {number}               start     — seconds from presentation start
+ * @property {number}               duration  — seconds (0 if unknown)
+ * @property {DashRepresentation[]} video
+ * @property {DashRepresentation[]} audio
  */
 
 /**
  * Parse a DASH MPD manifest.
  *
+ * `video` / `audio` list the primary (longest) period's representations —
+ * what the quality picker shows. `periods` holds every period so a
+ * download can stitch multi-period presentations (e.g. ad breaks or
+ * chapters) back together.
+ *
  * @param {string} xml      — raw MPD XML text
  * @param {string} baseUrl  — base URL used to resolve relative URIs
- * @returns {{ video: DashRepresentation[], audio: DashRepresentation[], hasDrm: boolean }}
+ * @returns {{ video: DashRepresentation[], audio: DashRepresentation[], hasDrm: boolean,
+ *             periods: DashPeriod[], primaryPeriod: number }}
  */
 export function parseMpd(xml, baseUrl) {
   // DOMParser is unavailable in MV3 service workers — use the lite parser.
@@ -43,28 +61,47 @@ export function parseMpd(xml, baseUrl) {
 
   // Resolve BaseURL if present
   const mpdBase = resolveBaseUrl(mpd, baseUrl);
+  const presentationDuration = parseDuration(mpd.attrs.mediaPresentationDuration || '');
 
-  const video = [];
-  const audio = [];
   let hasDrm = false;
+  const periodEls = children(mpd, 'Period');
 
-  const periods = children(mpd, 'Period');
-  for (const period of periods) {
+  // Period timing: @start, else previous start + duration; duration from
+  // @duration, else the next period's start, else the presentation end.
+  const timing = [];
+  periodEls.forEach((period, i) => {
+    const prev = timing[i - 1];
+    const start = period.attrs.start != null
+      ? parseDuration(period.attrs.start)
+      : prev ? prev.start + prev.duration : 0;
+    timing.push({ start, duration: parseDuration(period.attrs.duration || '') });
+  });
+  timing.forEach((t, i) => {
+    if (t.duration) return;
+    const next = timing[i + 1];
+    const end = next ? next.start : presentationDuration;
+    t.duration = Math.max(0, end - t.start);
+  });
+
+  const periods = periodEls.map((period, periodIndex) => {
     const periodBase = resolveBaseUrl(period, mpdBase);
+    const { start, duration } = timing[periodIndex];
+    const video = [];
+    const audio = [];
 
-    const adaptationSets = children(period, 'AdaptationSet');
-    for (const as of adaptationSets) {
+    for (const as of children(period, 'AdaptationSet')) {
       const asBase = resolveBaseUrl(as, periodBase);
       const asMime = as.attrs.mimeType || '';
       const asCodecs = as.attrs.codecs || '';
       const contentType = as.attrs.contentType || asMime.split('/')[0] || '';
+      const lang = as.attrs.lang || '';
+      const role = child(as, 'Role')?.attrs.value || '';
 
       // DRM detection
       const cpElements = descendants(as, 'ContentProtection');
       if (cpElements.length > 0) hasDrm = true;
 
-      const representations = children(as, 'Representation');
-      for (const rep of representations) {
+      for (const rep of children(as, 'Representation')) {
         const repBase = resolveBaseUrl(rep, asBase);
         const mimeType = rep.attrs.mimeType || asMime;
         const codecs = rep.attrs.codecs || asCodecs;
@@ -78,9 +115,8 @@ export function parseMpd(xml, baseUrl) {
         if (repCp.length > 0) hasDrm = true;
 
         // Resolve segments
-        const { initUrl, segmentUrls } = resolveSegments(rep, as, period, mpd, repBase);
-
-        const label = buildLabel(width, height, bandwidth, codecs);
+        const { initUrl, segmentUrls, timeOffset } =
+          resolveSegments(rep, as, period, repBase, duration, start);
 
         const entry = {
           id,
@@ -90,10 +126,16 @@ export function parseMpd(xml, baseUrl) {
           height,
           codecs,
           mimeType,
-          label,
+          label: buildLabel(width, height, bandwidth, codecs),
           initUrl,
           segmentUrls,
           hasDrm: cpElements.length > 0 || repCp.length > 0,
+          lang,
+          role,
+          periodIndex,
+          // Seconds to add to this period's media decode times to place
+          // them on the whole-presentation timeline.
+          timeOffset,
         };
 
         const type = contentType || mimeType.split('/')[0];
@@ -106,13 +148,60 @@ export function parseMpd(xml, baseUrl) {
         }
       }
     }
-  }
 
-  // Sort by bandwidth descending (highest quality first)
-  video.sort((a, b) => b.bandwidth - a.bandwidth);
-  audio.sort((a, b) => b.bandwidth - a.bandwidth);
+    // Sort by bandwidth descending (highest quality first)
+    video.sort((a, b) => b.bandwidth - a.bandwidth);
+    audio.sort((a, b) => b.bandwidth - a.bandwidth);
+    return { start, duration, video, audio };
+  });
 
-  return { video, audio, hasDrm };
+  // Primary period: the longest one that has media (an ad pre-roll is
+  // usually shorter than the programme).
+  let primaryPeriod = 0;
+  periods.forEach((p, i) => {
+    const best = periods[primaryPeriod];
+    const hasMedia = p.video.length || p.audio.length;
+    const bestHasMedia = best.video.length || best.audio.length;
+    if (hasMedia && (!bestHasMedia || p.duration > best.duration)) primaryPeriod = i;
+  });
+  const primary = periods[primaryPeriod] || { video: [], audio: [] };
+
+  return { video: primary.video, audio: primary.audio, hasDrm, periods, primaryPeriod };
+}
+
+/**
+ * Find the representation in another period that corresponds to `rep`:
+ * same id, else (video) same height or (audio) same language, nearest
+ * bandwidth.
+ *
+ * @param {DashRepresentation} rep
+ * @param {DashRepresentation[]} candidates
+ * @returns {DashRepresentation|null}
+ */
+export function matchRepresentation(rep, candidates) {
+  if (!candidates?.length) return null;
+  const byId = candidates.find(c => c.id && c.id === rep.id);
+  if (byId) return byId;
+  const similar = candidates.filter(c => (rep.height ? c.height === rep.height : c.lang === rep.lang));
+  const pool = similar.length ? similar : candidates;
+  return pool.reduce((best, c) =>
+    Math.abs(c.bandwidth - rep.bandwidth) < Math.abs(best.bandwidth - rep.bandwidth) ? c : best);
+}
+
+/**
+ * Choose the audio track: the browser's language, then the "main" role,
+ * then the highest bandwidth.
+ *
+ * @param {DashRepresentation[]} audio — sorted by bandwidth descending
+ * @param {string} [uiLanguage]
+ * @returns {DashRepresentation|null}
+ */
+export function pickAudioRepresentation(audio, uiLanguage = '') {
+  if (!audio?.length) return null;
+  const lang = uiLanguage.toLowerCase().split('-')[0];
+  return (lang && audio.find(a => a.lang.toLowerCase().split('-')[0] === lang))
+    || audio.find(a => a.role === 'main')
+    || audio[0];
 }
 
 /**
@@ -134,8 +223,9 @@ function resolveBaseUrl(element, fallback) {
   return fallback;
 }
 
-function resolveSegments(rep, adaptationSet, period, mpd, baseUrl) {
+function resolveSegments(rep, adaptationSet, period, baseUrl, totalDuration, periodStart) {
   let initUrl = null;
+  let timeOffset = periodStart;
   const segmentUrls = [];
 
   // SegmentList approach
@@ -152,7 +242,7 @@ function resolveSegments(rep, adaptationSet, period, mpd, baseUrl) {
     // Byte-range lists (mediaRange only) point into one file at baseUrl,
     // which already holds the init and every fragment — fetch it whole.
     if (segmentUrls.length === 0) segmentUrls.push(baseUrl);
-    return { initUrl, segmentUrls };
+    return { initUrl, segmentUrls, timeOffset };
   }
 
   // SegmentTemplate approach — attributes inherit Period → AdaptationSet → Representation
@@ -171,9 +261,7 @@ function resolveSegments(rep, adaptationSet, period, mpd, baseUrl) {
     const startNumber = parseInt(tmplAttrs.startNumber || '1', 10);
     const timescale = parseInt(tmplAttrs.timescale || '1', 10);
     const presentationTimeOffset = parseInt(tmplAttrs.presentationTimeOffset || '0', 10) || 0;
-    const totalDuration = parseDuration(
-      period.attrs.duration || mpd.attrs.mediaPresentationDuration || ''
-    );
+    timeOffset = periodStart - presentationTimeOffset / timescale;
 
     if (initTmpl) {
       initUrl = resolveUrl(
@@ -235,13 +323,13 @@ function resolveSegments(rep, adaptationSet, period, mpd, baseUrl) {
       }
     }
 
-    return { initUrl, segmentUrls };
+    return { initUrl, segmentUrls, timeOffset };
   }
 
   // SegmentBase / BaseURL-only (single file). The file already contains
   // its own init (ftyp/moov), so no separate init segment is fetched.
   segmentUrls.push(baseUrl);
-  return { initUrl, segmentUrls };
+  return { initUrl, segmentUrls, timeOffset };
 }
 
 function fillTemplate(template, repId, bandwidth, number, time) {
@@ -280,9 +368,10 @@ function resolveUrl(relative, base) {
  */
 function parseDuration(iso) {
   if (!iso) return 0;
-  const m = iso.match(/PT(?:(\d+)H)?(?:(\d+)M)?(?:([\d.]+)S)?/);
+  const m = iso.match(/P(?:(\d+)D)?T?(?:(\d+)H)?(?:(\d+)M)?(?:([\d.]+)S)?/);
   if (!m) return 0;
-  return (parseInt(m[1] || 0, 10) * 3600) +
-         (parseInt(m[2] || 0, 10) * 60) +
-         parseFloat(m[3] || 0);
+  return (parseInt(m[1] || 0, 10) * 86400) +
+         (parseInt(m[2] || 0, 10) * 3600) +
+         (parseInt(m[3] || 0, 10) * 60) +
+         parseFloat(m[4] || 0);
 }
