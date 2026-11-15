@@ -85,7 +85,9 @@ async function testCompanion() {
 function initCompanion() {
   if (!companionSupported()) return;
   document.getElementById('companion-section').hidden = false;
-  document.getElementById('install-cmd').textContent = `companion/install.sh ${chrome.runtime.id}`;
+  document.getElementById('install-cmd').textContent = `bash companion/install.sh ${chrome.runtime.id}`;
+  document.getElementById('install-cmd-win').textContent =
+    `powershell -ExecutionPolicy Bypass -File companion\\install.ps1 ${chrome.runtime.id}`;
   document.getElementById('companionEnabled').addEventListener('change', onCompanionToggle);
   document.getElementById('btn-test-companion').addEventListener('click', testCompanion);
 }

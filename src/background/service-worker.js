@@ -429,13 +429,16 @@ async function revokeBlobUrl(url) {
 
 /**
  * Auth context for an embed URL: a Bearer header from JWT-like query
- * tokens, scoped to the embed's site (see fetch-strategy authHeadersFor).
- * Cookies are not copied — fetches use credentials: 'include'.
+ * tokens, scoped to the embed's host (see fetch-strategy authHeadersFor).
+ * HTTP embeds get no token headers at all, so nothing — including the
+ * embed-page fallback fetch — sends them in plaintext. Cookies are not
+ * copied — fetches use credentials: 'include'.
  */
 function buildAuthContext(platformUrl) {
-  let authOrigin = null;
-  try { authOrigin = new URL(platformUrl).origin; } catch { /* invalid URL */ }
-  return { authHeaders: buildAuthHeaders(extractAuthTokens(platformUrl)), authOrigin };
+  let url = null;
+  try { url = new URL(platformUrl); } catch { /* invalid URL */ }
+  if (url?.protocol !== 'https:') return { authHeaders: {}, authOrigin: null };
+  return { authHeaders: buildAuthHeaders(extractAuthTokens(platformUrl)), authOrigin: url.origin };
 }
 
 function uiLanguage() {

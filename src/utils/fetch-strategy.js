@@ -22,17 +22,17 @@
 // ── Auth scoping ────────────────────────────────────────────────────
 
 /**
- * True when `url` is the embed's own origin or an https subdomain of the
- * embed's host. Sibling hosts are excluded on purpose: without a public-
- * suffix list, "same last two labels" would trust unrelated tenants
- * (victim.github.io vs attacker.github.io).
+ * True when `url` is HTTPS and is the embed's own origin or a subdomain of
+ * the embed's host. Sibling hosts are excluded on purpose: without a
+ * public-suffix list, "same last two labels" would trust unrelated tenants
+ * (victim.github.io vs attacker.github.io). Tokens never travel over HTTP.
  */
 export function isAuthTarget(url, origin) {
   try {
     const u = new URL(url);
     const o = new URL(origin);
-    if (u.origin === o.origin) return true;
-    return u.protocol === 'https:' && u.hostname.endsWith(`.${o.hostname}`);
+    if (u.protocol !== 'https:' || o.protocol !== 'https:') return false;
+    return u.origin === o.origin || u.hostname.endsWith(`.${o.hostname}`);
   } catch {
     return false;
   }

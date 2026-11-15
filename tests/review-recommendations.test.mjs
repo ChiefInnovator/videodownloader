@@ -106,6 +106,14 @@ test('embed Bearer token reaches the embed host and its subdomains only', async 
   const fs = await h.utils('fetch-strategy');
   assert.equal(fs.isAuthTarget('https://attacker.github.io/x.m3u8', 'https://victim.github.io'), false);
   assert.equal(fs.isAuthTarget('http://cdn.player.example/x', 'https://player.example'), false);
+  assert.equal(fs.isAuthTarget('http://player.example/x', 'http://player.example'), false, 'no tokens over HTTP');
+
+  // HTTP embeds get no token headers, so the embed-page fallback cannot leak them.
+  const httpEmbed = 'http://plain.example/embed/abc?token=aaaa.bbbb.cccc';
+  h.routes.set(httpEmbed, '<html></html>');
+  const resolved = await h.dispatch({ action: 'resolveIframe', tabId: 7, url: httpEmbed });
+  assert.deepEqual(JSON.parse(JSON.stringify(resolved.authHeaders)), {});
+  assert.equal(h.requests.find(r => r.url === httpEmbed)?.opts.headers?.Authorization, undefined);
   assert.ok(h.requests.every(r => !r.opts?.headers?.Cookie), 'no hand-built Cookie headers');
 });
 
@@ -228,6 +236,16 @@ test('multi-period DASH is stitched with decode times rebased per period', async
   assert.equal(result.error, undefined);
   const out = inspect(new Uint8Array(await h.blobs[0].arrayBuffer()));
   assert.deepEqual(out.fragments.map(f => f.decode), [0, 10000]);
+
+  // SegmentList and SegmentBase inherit presentationTimeOffset too.
+  const listPeriod = (id, start) => `<Period id="${id}" start="${start}" duration="PT10S"><SegmentList timescale="1000" presentationTimeOffset="5000"/>` +
+    `<AdaptationSet mimeType="video/mp4"><Representation id="v" bandwidth="1000"><SegmentList><SegmentURL media="${id}.m4s"/></SegmentList></Representation></AdaptationSet></Period>`;
+  const listMpd = parsedMpd => Array.from(parsedMpd.periods, p => p.video[0].timeOffset);
+  const parser = await h.utils('dash-parser');
+  assert.deepEqual(listMpd(parser.parseMpd(`<MPD>${listPeriod('a', 'PT0S')}${listPeriod('b', 'PT10S')}</MPD>`, mpdUrl)), [-5, 5]);
+  const basePeriod = `<Period start="PT20S"><AdaptationSet mimeType="video/mp4"><SegmentBase timescale="90000" presentationTimeOffset="180000"/>` +
+    `<Representation id="v" bandwidth="1"><BaseURL>v.mp4</BaseURL></Representation></AdaptationSet></Period>`;
+  assert.deepEqual(listMpd(parser.parseMpd(`<MPD>${basePeriod}</MPD>`, mpdUrl)), [18]);
 });
 
 test('DASH audio follows the browser language, then the main role', async () => {

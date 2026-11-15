@@ -228,9 +228,20 @@ function resolveSegments(rep, adaptationSet, period, baseUrl, totalDuration, per
   let timeOffset = periodStart;
   const segmentUrls = [];
 
+  // SegmentList / SegmentBase timing (timescale, presentationTimeOffset)
+  // inherits Period → AdaptationSet → Representation like SegmentTemplate.
+  const offsetFrom = (name) => {
+    const attrs = Object.assign({}, ...[period, adaptationSet, rep]
+      .map(el => child(el, name)?.attrs).filter(Boolean));
+    const timescale = parseInt(attrs.timescale || '1', 10) || 1;
+    const pto = parseInt(attrs.presentationTimeOffset || '0', 10) || 0;
+    return periodStart - pto / timescale;
+  };
+
   // SegmentList approach
   const segList = child(rep, 'SegmentList') || child(adaptationSet, 'SegmentList');
   if (segList) {
+    timeOffset = offsetFrom('SegmentList');
     const initEl = child(segList, 'Initialization');
     if (initEl?.attrs.sourceURL) {
       initUrl = resolveUrl(initEl.attrs.sourceURL, baseUrl);
@@ -328,6 +339,7 @@ function resolveSegments(rep, adaptationSet, period, baseUrl, totalDuration, per
 
   // SegmentBase / BaseURL-only (single file). The file already contains
   // its own init (ftyp/moov), so no separate init segment is fetched.
+  timeOffset = offsetFrom('SegmentBase');
   segmentUrls.push(baseUrl);
   return { initUrl, segmentUrls, timeOffset };
 }
