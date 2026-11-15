@@ -595,5 +595,8 @@ test('companion turns common yt-dlp refusals into plain guidance', async () => {
   assert.equal(friendlyError('[youtube] abc: Private video. Sign in if you have been granted access'), 'This video is private.');
   assert.match(friendlyError("[youtube] abc: This content isn't available in your country"), /your region/);
   assert.match(friendlyError('[youtube] abc: The uploader has not made this video available in your country'), /your region/);
+  assert.equal(friendlyError('ERROR: [youtube] abc: Video unavailable. This video is unavailable'), 'This video is unavailable.');
+  assert.equal(friendlyError('[youtube] abc: This live event will begin in 2 hours.'), "This video hasn't started yet.");
+  assert.equal(friendlyError('[youtube] abc: Premieres in 3 days'), "This video hasn't started yet.");
   assert.equal(friendlyError('[youtube] abc: Some new failure'), 'Some new failure');
 });
