@@ -512,6 +512,13 @@ test('update check: semver comparison', async () => {
   assert.equal(u.isNewer('v3.0.0', '3.0.0'), false);
   assert.equal(u.isNewer('v2.9.9', '3.0.0'), false);
   assert.equal(u.isNewer('nightly', '3.0.0'), false);
+  const fallback = 'https://github.com/ChiefInnovator/videodownloader/releases/latest';
+  assert.equal(u.safeReleaseUrl('https://github.com/ChiefInnovator/videodownloader/releases/tag/v3.1.0'),
+    'https://github.com/ChiefInnovator/videodownloader/releases/tag/v3.1.0');
+  assert.equal(u.safeReleaseUrl('https://github.com/ChiefInnovator/videodownloader/releases/../../other-repo/releases/tag/v1.0.0'), fallback);
+  assert.equal(u.safeReleaseUrl('http://github.com/ChiefInnovator/videodownloader/releases/tag/v3.1.0'), fallback);
+  assert.equal(u.safeReleaseUrl('https://github.com.evil.example/ChiefInnovator/videodownloader/releases/tag/v3.1.0'), fallback);
+  assert.equal(u.safeReleaseUrl(null), fallback);
 });
 
 test('update check: daily, cookie-less, can be turned off, links only to this repo', async () => {

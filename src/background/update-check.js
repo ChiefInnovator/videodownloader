@@ -33,6 +33,22 @@ export function isNewer(latest, current) {
   return false;
 }
 
+/**
+ * Only ever link to this repository's release pages. Parsing with URL
+ * normalises dot segments, so ".../releases/../../other-repo/..." can't
+ * slip past a prefix check.
+ */
+export function safeReleaseUrl(value) {
+  try {
+    const u = new URL(String(value));
+    if (u.protocol === 'https:' && u.host === 'github.com' && !u.search && !u.hash
+        && /^\/ChiefInnovator\/videodownloader\/releases\/(?:latest|tag\/v?\d+\.\d+\.\d+)$/.test(u.pathname)) {
+      return u.href;
+    }
+  } catch { /* not a URL */ }
+  return RELEASES_PAGE;
+}
+
 async function enabled() {
   const { checkForUpdates } = await chrome.storage.sync.get({ checkForUpdates: true });
   return checkForUpdates !== false;
@@ -81,10 +97,7 @@ export async function checkForUpdate({ force = false } = {}) {
       const data = await res.json();
       if (!parseVersion(data.tag_name)) throw new Error('Unrecognised release tag');
       next.latest = String(data.tag_name).replace(/^v/, '');
-      // Only ever link to this repository's release pages.
-      next.url = typeof data.html_url === 'string'
-        && data.html_url.startsWith('https://github.com/ChiefInnovator/videodownloader/releases/')
-        ? data.html_url : RELEASES_PAGE;
+      next.url = safeReleaseUrl(data.html_url);
     } catch (err) {
       next.error = err.message;
     }
