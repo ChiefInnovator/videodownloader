@@ -39,3 +39,8 @@ key.pem
 # Impeccable local state
 .impeccable/hook.cache.json
 .impeccable/config.local.json
+
+# Companion install artifacts (generated per machine)
+companion/run_host.sh
+companion/run_host.bat
+companion/com.inventingfire.videodownloader.json

@@ -4,7 +4,7 @@
 
 Built by **Rich Crane** — Microsoft MVP, Founder & Chief AI Officer at MILL5. Part of the **Inventing Fire with AI** initiative.
 
-Detect, extract, and download video content from web pages for offline viewing — including cross-origin iframe embeds and AES-128 encrypted HLS/DASH streams. No analytics. No telemetry. No accounts. Nothing leaves your browser except the segment fetches required to download the video you selected.
+Detect, extract, and download video content from web pages for offline viewing — including cross-origin iframe embeds and AES-128 encrypted HLS/DASH streams. No analytics. No telemetry. No accounts. Nothing leaves your browser except the segment fetches required to download the video you selected. YouTube is available only through the optional [companion app](companion/README.md), which hands the video URL to yt-dlp on your computer.
 
 ## Features
 
@@ -16,14 +16,16 @@ Detect, extract, and download video content from web pages for offline viewing �
 - **Resilient downloads** — up to 5 retries per segment with exponential backoff; a segment that stays unavailable is skipped and reported (never the first or an init segment, at most 10%); Anvato/Uplynk ad segments are dropped
 - **Player-config detection** — finds media URLs in JW Player / Video.js / Flowplayer setup code, Next.js and Nuxt page data, `<mux-player>` elements, JSON-LD `embedUrl`, `og:video:type`, and `twitter:player:stream`
 - **AES-128 stream decryption** — fetches encryption keys, decrypts segments, and assembles into a single file
-- **DASH (MPD) support** — parses adaptation sets and representations for quality selection
+- **DASH (MPD) support** — parses adaptation sets and representations for quality selection; multi-period presentations are stitched into one file with timestamps rebased per period; the audio track follows the browser language, then the `main` role
+- **Separate HLS audio** — `#EXT-X-MEDIA TYPE=AUDIO` renditions are muxed into the MP4 for fMP4/CMAF streams, or saved as a second `(audio)` file next to classic TS video
 - Quality selection for multi-variant HLS and multi-representation DASH
 - One-click download with real-time segment-level progress tracking
-- **Pause/resume/cancel** for stream assembly downloads
-- **Authentication forwarding** — propagates JWT tokens and session cookies to video platform APIs
+- **Pause/resume/cancel** for stream assembly downloads; reopening the popup reconnects to downloads still running and blocks starting the same one twice
+- **Authentication forwarding** — fetches run with the browser's own cookies (`credentials: 'include'`, or inside the player frame); JWT tokens from an embed URL are sent as `Authorization: Bearer` only to that embed's host and its subdomains
 - **DRM detection** — warns users when Widevine/PlayReady/FairPlay (incl. `skd://` and DRM `KEYFORMAT`s) or Adobe Access prevents download
 - Clean dark-themed popup UI with video thumbnails and metadata
-- Configurable default format, quality, and download location
+- Configurable preferred quality and download subfolder
+- **YouTube via companion app (optional)** — a native-messaging helper wrapping [yt-dlp](https://github.com/yt-dlp/yt-dlp); off by default, not included in the Chrome Web Store build — see [companion/README.md](companion/README.md)
 - SPA-compatible via MutationObserver for dynamically loaded content
 - **Session-titled files** — captures each video's session/player title when detected, so playing another video on the same page keeps earlier names intact. Historical streams without a captured title use their URL filename.
 - **Audio only** — DASH streams with a separate audio track offer "Audio only (.m4a)": the original AAC track wrapped as M4A, no re-encoding
@@ -38,7 +40,8 @@ videodownloader/
 ├── manifest.json                     # Manifest V3 config
 ├── src/
 │   ├── background/
-│   │   └── service-worker.js         # Network interception, downloads, stream orchestration
+│   │   ├── service-worker.js         # Network interception, downloads, stream orchestration
+│   │   └── companion.js              # Native-messaging client for the optional YouTube companion
 │   ├── content/
 │   │   └── detector.js               # DOM + iframe scanning, MutationObserver
 │   ├── popup/
@@ -51,9 +54,11 @@ videodownloader/
 │       ├── dash-parser.js            # MPD XML parser
 │       ├── aes-decrypt.js            # AES-128-CBC decryption (Web Crypto API)
 │       ├── segment-downloader.js     # Segment fetch/decrypt/concat with retry
-│       ├── iframe-resolver.js        # Iframe classification, auth extraction, embed parsing
+│       ├── iframe-resolver.js        # Embed auth-token extraction, embed-page manifest parsing
+│       ├── youtube.js                # YouTube URL helpers (companion routing, chunk filtering)
 │       ├── platform-resolvers.js     # Embed URL → manifest via Vimeo/Wistia/JW/Mux/Cloudflare/Vidyard/Panopto APIs
 │       └── page-context.js           # Video title + slide-deck links from every frame
+├── companion/                        # Optional YouTube helper: yt-dlp native-messaging host + installers
 ├── icons/                            # Extension icons (16/48/128px)
 ├── scripts/
 │   ├── generate-icons.js             # Node.js icon generator (no deps)
@@ -124,10 +129,11 @@ Or open `scripts/generate-icons.html` in Chrome and click **Download All Icons**
 ## Chrome Web Store Packaging
 
 1. Ensure PNG icons exist in `icons/`
-2. Build the zip (manifest, `src/`, `icons/` only):
+2. Build the store zip (manifest, `src/`, `icons/` only, with the companion's optional `nativeMessaging` permission removed):
    ```bash
-   bash scripts/package.sh   # → dist/videodownloader-v<version>.zip
+   bash scripts/package.sh --store   # → dist/videodownloader-store-v<version>.zip
    ```
+   Plain `bash scripts/package.sh` builds the GitHub Release zip (companion supported) plus `dist/videodownloader-companion-v<version>.zip`.
 3. Upload the zip at the [Chrome Developer Dashboard](https://chrome.google.com/webstore/devconsole)
 
 ## Releasing
@@ -138,7 +144,7 @@ Bump `version` in `manifest.json`, merge to `main`, then push a matching tag:
 git tag v2.1.0 && git push origin v2.1.0
 ```
 
-The [Release workflow](.github/workflows/release.yml) packages the extension and publishes a GitHub Release with the zip attached.
+The [Release workflow](.github/workflows/release.yml) packages the extension and publishes a GitHub Release with the extension zip and the companion zip attached.
 
 ## Known Limitations
 
@@ -146,11 +152,13 @@ The [Release workflow](.github/workflows/release.yml) packages the extension and
 - **DRM-protected content** (Widevine/PlayReady/FairPlay) is detected and flagged but cannot be downloaded
 - **Cross-origin iframes** are resolved via embed page parsing and network interception (not DOM access)
 - **CORS-restricted manifests** may prevent quality expansion; the top-level URL still works
-- **Authenticated streams** require an active session — tokens are forwarded from the iframe URL and cookies
+- **Authenticated streams** require an active session — the browser's cookies are used as-is, and iframe-URL tokens go only to the embed's host and its subdomains
 - **TS output** — classic (MPEG-TS) HLS streams are saved as `.ts` files; use VLC/mpv for playback or ffmpeg for MP4 conversion. fMP4/CMAF HLS saves as `.mp4`
-- **Separate HLS audio renditions** (`#EXT-X-MEDIA TYPE=AUDIO`) are not merged yet — the video variant is downloaded on its own
-- **Live HLS** — only the segments currently in the playlist window are captured
-- **YouTube** is not supported
+- **Separate HLS audio with TS video** is saved as two files (video `.ts` + `(audio)` file); only fMP4/CMAF streams are muxed into one MP4
+- **Live HLS** — only the segments currently in the playlist window are captured; the popup marks these streams **LIVE**
+- **Memory** — a stream is assembled in memory before saving, so very long high-bitrate downloads need free RAM roughly equal to the file size
+- **No format conversion** — files keep the container they were served in
+- **YouTube** works only through the optional companion app (yt-dlp on your computer); the extension itself never extracts YouTube streams
 
 See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for full technical details, detection strategy, and edge cases.
 

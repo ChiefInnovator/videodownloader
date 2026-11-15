@@ -4,7 +4,7 @@
 
 ## Overview
 
-Video Downloader is a Chrome Manifest V3 extension with six main components:
+Video Downloader is a Chrome Manifest V3 extension with six main components, plus an optional native companion for YouTube (see [YouTube companion](#youtube-companion-optional)):
 
 ```text
 ┌─────────────┐     messages     ┌──────────────────────┐
@@ -13,7 +13,7 @@ Video Downloader is a Chrome Manifest V3 extension with six main components:
 └──────┬──────┘                  └──────────┬───────────┘
        │                                    │
        │  chrome.tabs.sendMessage           │  chrome.webRequest
-       ▼                                    │  chrome.cookies
+       ▼                                    │  connectNative (opt.)
 ┌─────────────┐                  ┌──────────┴───────────┐
 │Content Script│                  │   Network Layer      │
 │ (detector.js)│                  │ (header intercept)   │
@@ -29,6 +29,7 @@ Video Downloader is a Chrome Manifest V3 extension with six main components:
                  • segment-downloader.js
                  • iframe-resolver.js
                  • platform-resolvers.js
+                 • youtube.js
                  • page-context.js
                  • formats.js
 ```
@@ -61,11 +62,16 @@ Long-lived Manifest V3 service worker — the central coordinator:
   2. Checks for manifests already captured via network interception that belong to this embed — requested by its frame (or a frame inside it). Shared origins are not evidence of frame ownership; absent navigation metadata, skip the network shortcut and parse the embed instead. Other players' manifests on the page are ignored.
   3. Falls back to fetching the embed page HTML and parsing for manifest URLs.
   4. Detects DRM indicators (Widevine/PlayReady/FairPlay UUIDs).
-- **Authentication forwarding** — extracts JWT tokens from iframe URL query parameters and retrieves session cookies via `chrome.cookies.getAll()`. Builds auth headers for all manifest/segment/key fetches.
-- **HLS expansion** — fetches M3U8 master playlists, parses variants, and probes first variant for AES-128 encryption or DRM.
-- **DASH expansion** — fetches MPD manifests and parses them via `dash-parser.js`.
+  YouTube URLs are not resolved; they are routed to the companion instead.
+- **Message trust** — only the extension's own pages (popup, options) may send it commands: messages from content scripts (`sender.tab` set) or other extensions are answered with `Forbidden`.
+- **Authentication forwarding** — extracts JWT tokens from iframe URL query parameters into an `Authorization: Bearer` header that is sent only over HTTPS to the embed's own origin or subdomains of its host (never sibling hosts, which could be unrelated tenants of a shared suffix). HTTP embeds get no token header. Cookies are never copied into headers (`Cookie` is a forbidden fetch header); fetches use `credentials: 'include'` or run inside the player's frame.
+- **HLS expansion** — fetches M3U8 master playlists, parses variants, and probes the first variant for AES-128 encryption, DRM, and live status (no `#EXT-X-ENDLIST`).
+- **DASH expansion** — fetches MPD manifests and parses them via `dash-parser.js`; the picker lists the primary (longest) period's representations.
 - **Stream download orchestration** — coordinates the segment downloader for HLS and DASH:
   - Parses the media playlist / MPD for segment URLs. HLS playlists with DRM keys are refused; fMP4 HLS (`#EXT-X-MAP`) puts each init segment ahead of its media segments and saves as `.mp4`.
+  - HLS separate audio: the popup sends the master URL alongside the chosen variant; the variant's `AUDIO` group picks an `#EXT-X-MEDIA` rendition (browser language, then `DEFAULT=YES`, then first). fMP4 video + fMP4 audio are muxed with `mp4-mux.js`; otherwise the audio is saved as a second file (`<name> (audio).<aac|ts|m4a>`).
+  - DASH multi-period: the chosen representation is matched in every period (same id, else same height / language with nearest bandwidth) and the periods are concatenated; each segment's `tfdt` is shifted by `Period@start − presentationTimeOffset/timescale` (inherited from SegmentTemplate, SegmentList, or SegmentBase) so the output has one continuous timeline. The audio track follows the browser language, then `Role=main`, then bandwidth.
+  - Refuses to start a second job for a stream already running or paused (`sourceUrl` match). `getStreamJobs` lists running jobs as plain data so a reopened popup can reattach.
   - Delegates to `segment-downloader.js` for parallel fetch, AES-128 decrypt, and assembly.
   - Saves the final blob via `chrome.downloads`.
 - **Simple download management** — wraps `chrome.downloads.download()` for direct video files.
@@ -78,10 +84,11 @@ Rendered when the user clicks the extension icon:
 - Deduplicates direct videos by URL and renders video cards with thumbnail, metadata badges, and download button.
 - The worker captures session/player titles once per network video URL at detection, scoped to the requesting frame and top-page modal. The popup prefers that captured title over later DOM scans. Historical manifests recovered from Resource Timing use URL filenames when their original title is unavailable; they never inherit the current session title. Captures time out after two seconds and are cancelled on top-level navigation or tab removal; late results cannot change reset detection state. Captured network titles live in worker memory and reset with its other detection state.
 - Renders a separate **"Embedded Streams"** section for detected iframes, each with a **Resolve Stream** button.
-- On resolve: calls the service worker to extract manifest URLs, shows DRM warnings if applicable, or populates a quality dropdown with available variants. DASH streams with a separate audio track also get an **Audio only (.m4a)** entry; the service worker then downloads just that representation and saves it as `audio/mp4`.
+- On resolve: calls the service worker to extract manifest URLs, shows DRM warnings if applicable, or populates a quality dropdown with available variants, preselecting the best one at or below the **Preferred quality** setting. DASH streams with a separate audio track also get an **Audio only (.m4a)** entry; the service worker then downloads just that representation and saves it as `audio/mp4`.
 - Each detected video has a **Copy link** button (`navigator.clipboard`) for its direct or manifest URL.
 - Transitions and animations are disabled under `prefers-reduced-motion: reduce`.
-- For stream downloads: shows segment-level progress (e.g., "Segment 42/128 (33%) — 2.4 MB/s — 1m left") with **Pause**, **Resume**, and **Cancel** controls.
+- For stream downloads: shows segment-level progress (e.g., "Segment 42/128 (33%) — 2.4 MB/s — 1m left") with **Pause**, **Resume**, and **Cancel** controls. On open it asks for `getStreamJobs` and reconnects cards to downloads still running. Live HLS gets a **LIVE** badge.
+- YouTube entries (embeds, thumbnails, links, or the youtube.com watch page itself) render as **YOUTUBE** cards: with the companion connected they offer Best / 1080p / 720p / 480p / Audio only and a Download button; otherwise they explain that the companion is needed and link to Settings.
 - For direct downloads: shows byte-level progress via `chrome.downloads` polling.
 
 ### 4. Options Page (`src/options/`)
@@ -90,10 +97,12 @@ Persists user preferences to `chrome.storage.sync`:
 
 | Setting | Purpose |
 | ------- | ------- |
-| `defaultFormat` | Force downloaded files to a specific extension |
-| `defaultQuality` | Auto-select HLS/DASH quality level |
-| `downloadPath` | Subfolder within Chrome's download directory |
-| `showNotifications` | Toggle completion notifications |
+| `defaultQuality` | Preselect the best stream quality at or below this height |
+| `downloadPath` | Subfolder within Chrome's download directory (also used by the companion under `~/Downloads`) |
+| `companionEnabled` | YouTube via the companion app; toggling it requests/removes the optional `nativeMessaging` permission |
+| `ytCookiesFromBrowser` | Pass `--cookies-from-browser chrome` to yt-dlp |
+
+The companion section only appears when the build declares `nativeMessaging` in `optional_permissions` (not in the store build).
 
 ### 5. Utility Modules (`src/utils/`)
 
@@ -102,11 +111,12 @@ Persists user preferences to `chrome.storage.sync`:
 | `formats.js` | MIME-to-extension mapping, human-readable sizes, quality labels, filename derivation |
 | `hls-parser.js` | M3U8 parser — master playlists, media playlists with segment-level detail, AES-128 `#EXT-X-KEY` extraction, `#EXT-X-MAP` init segments, `#EXT-X-BYTERANGE` ranges, live detection (no `#EXT-X-ENDLIST`), Anvato/Uplynk ad-segment removal, DRM detection (SAMPLE-AES, `skd://`, FairPlay/PlayReady/Widevine `KEYFORMAT`, `#EXT-X-FAXS-CM`), and a playlist-query fallback URL for each same-origin segment/key/init |
 | `dash-parser.js` | MPD XML parser — periods, adaptation sets, representations, SegmentTemplate/SegmentList/SegmentTimeline resolution, ISO 8601 duration parsing, ContentProtection DRM detection |
-| `aes-decrypt.js` | AES-128-CBC decryption via Web Crypto API — key import, segment decrypt, IV derivation from sequence number or hex string, authenticated key fetch |
+| `aes-decrypt.js` | AES-128-CBC decryption via Web Crypto API — key import, segment decrypt, IV derivation from sequence number or hex string |
 | `segment-downloader.js` | Parallel segment fetcher with AES-128 decrypt pipeline, HTTP Range requests (slicing the body if the server ignores Range), 5-retry exponential backoff capped at 20 s, skip-unavailable segments (not the first or `required` init segments, at most 10% of the job), playlist-query fallback URLs (switched on for the whole job once one succeeds), pause/resume via AbortController, progress callbacks, blob assembly |
 | `page-context.js` | Injected into every frame by the popup: picks the video title (modal title → player frame title → page title), finds slide-deck links (PPT/Key/ODP, or PDFs labelled slides/deck/presentation), recovers `.mpd`/`.m3u8` manifests the frame already loaded (Resource Timing) so the popup can re-register them after the service worker is suspended or reloaded, and builds safe filenames |
 | `platform-resolvers.js` | Embed URL → manifest through the platform's own player API: Mux and Cloudflare Stream (URL pattern), JW Player (`cdn.jwplayer.com/v2/media/{id}`), Wistia (`fast.wistia.net/embed/medias/{id}.json`), Vidyard (`play.vidyard.com/player/{uuid}.json`), Vimeo (`playerConfig` in the player page; `/sep/video/` → `/video/` for muxed audio), Panopto (`DeliveryInfo.aspx`, podcast stream first). Endpoints follow yt-dlp's extractors (Unlicense). Returns null on any failure so callers fall back |
-| `iframe-resolver.js` | Iframe URL classification (domain allow-list + path keywords), JWT/OAuth token extraction, session cookie forwarding, embed page HTML parsing for manifest URLs, DRM indicator detection |
+| `youtube.js` | YouTube URL detection, video-ID / watch-URL normalisation, and the `googlevideo.com` chunk filter |
+| `iframe-resolver.js` | JWT/OAuth token extraction into a Bearer header, embed page HTML parsing for manifest URLs, DRM indicator detection |
 
 ## Detection Strategy
 
@@ -114,7 +124,7 @@ Video detection follows a layered approach, ordered by reliability:
 
 1. **Network interception** (highest confidence) — if the browser fetched a resource with a video MIME type, it is almost certainly a video. Manifests (.m3u8/.mpd) are tracked separately for iframe resolution.
 2. **DOM `<video>` elements** — direct access to the playing source, dimensions, and duration.
-3. **Iframe classification** — cross-origin iframes are classified by domain and path. High-confidence matches (known video platforms) are surfaced immediately; medium-confidence matches require user-initiated resolution.
+3. **Iframe classification** — cross-origin iframes are classified by domain and path (the only domain list lives in `detector.js`). High-confidence matches (known video platforms) are surfaced immediately; medium-confidence matches require user-initiated resolution.
 4. **Structured data** — og:video, JSON-LD VideoObject.
 5. **Heuristic** — data attributes, URL pattern matching.
 
@@ -152,9 +162,9 @@ Results from all layers are merged and deduplicated by URL before display.
 
 Enterprise video platforms gate access behind authentication. The extension propagates auth context by:
 
-1. **URL query parameters** — extracts tokens from `at=`, `token=`, `jwt=`, `access_token=`, etc. in the iframe src.
-2. **Session cookies** — retrieves cookies for the video platform's domain via `chrome.cookies.getAll()`.
-3. **Header construction** — attaches `Authorization: Bearer <jwt>` and `Cookie: ...` headers to all manifest, segment, and key fetches.
+1. **URL query parameters** — extracts tokens from `at=`, `token=`, `jwt=`, `access_token=`, etc. in the iframe src and builds `Authorization: Bearer <jwt>`.
+2. **Site scoping** — that header is attached only to fetches on the embed's own origin or https subdomains of its host; third-party CDNs and key servers never see it.
+3. **Browser cookies** — fetches use `credentials: 'include'` (or run in the page/player frame), so the browser applies its own cookies. The extension does not read cookies and has no `cookies` permission.
 
 Tokens are held in memory only — never persisted to storage.
 
@@ -167,23 +177,45 @@ Tokens are held in memory only — never persisted to storage.
 | **Heavily obfuscated players** | If the player never creates a `<video>` element and uses MSE with blob URLs, network interception may catch the manifest but individual segments are not stitched together. |
 | **CORS-restricted M3U8/MPD** | Quality expansion may fail if the manifest server blocks cross-origin fetches. The download button still works for the top-level URL. |
 | **iframe-embedded videos** | Content script runs in `all_frames` for same-origin iframes. Cross-origin iframes are resolved via embed page parsing and network interception. |
-| **Rate-limited / authenticated streams** | Auth headers are forwarded from iframe URL tokens and session cookies. If the server requires additional auth (e.g., HMAC-signed URLs), download may fail. |
+| **Rate-limited / authenticated streams** | Iframe URL tokens go to the embed's site; the browser's own cookies apply. If the server requires additional auth (e.g., HMAC-signed URLs), download may fail. |
 | **SAMPLE-AES encryption** | Not supported (this is effectively DRM). Detected and flagged to the user. |
 | **Signed-URL CDNs** | If a same-origin segment or key without its own query fails, it is retried with the playlist's query string; once that works the whole job uses it. |
 | **Unavailable segments** | After 5 retries a segment is skipped (reported in the popup) unless it is the first or an init segment, or more than 10% have already been skipped. |
-| **Separate HLS audio renditions** | `#EXT-X-MEDIA TYPE=AUDIO` renditions are not merged yet; the video variant downloads on its own. |
-| **Live HLS** | Detected (no `#EXT-X-ENDLIST`); only the segments in the current playlist window are captured. |
+| **Separate HLS audio renditions** | Muxed for fMP4/CMAF; with TS video the audio is saved as a second file. |
+| **Live HLS** | Detected (no `#EXT-X-ENDLIST`) and badged **LIVE**; only the segments in the current playlist window are captured. |
+| **Multi-period DASH** | Periods are stitched and re-timed; a later period whose codec configuration differs from the first period's init segment may not play correctly. |
+| **Large streams** | Segments are held in worker memory until assembly; a job's buffers are released as soon as it completes or fails. |
+| **YouTube** | Not extracted by the extension; only via the optional companion. `googlevideo.com` chunk requests are ignored. |
 | **TS output format** | MPEG-TS HLS streams produce `.ts` files (fMP4 HLS produces `.mp4`). Most players (VLC, mpv) handle these natively. Convert to MP4 with `ffmpeg -i video.ts -c copy video.mp4`. |
 
 ## Security Considerations
 
-- The extension requests `<all_urls>` host permission for network interception and `cookies` for auth forwarding. These are required for cross-origin iframe resolution.
+- The extension requests `<all_urls>` host permission for network interception and cross-origin manifest/segment fetches. It has no `cookies` permission.
+- The service worker only accepts commands from the extension's own pages; content scripts cannot start downloads or read auth context.
+- `nativeMessaging` is optional, requested only when the user enables the companion, and stripped from the store build.
 - Authentication tokens are held in memory only and never written to `chrome.storage` or disk.
-- No data leaves the browser — all processing (parsing, decryption, assembly) is local.
+- No data leaves the browser — all processing (parsing, decryption, assembly) is local. With the companion enabled, a YouTube URL is handed to yt-dlp on the same computer, which fetches only that video.
 - No external services or analytics are used.
 - Content script uses a guard variable to prevent double-injection.
 - AES-128 decryption uses the Web Crypto API — no custom crypto implementations.
 
+## YouTube companion (optional)
+
+`companion/videodownloader_host.py` is a Chrome native-messaging host (Python 3 standard library) registered as `com.inventingfire.videodownloader` by `companion/install.sh` / `install.ps1`, with `allowed_origins` set to this extension's ID.
+
+```text
+popup ──companionDownload──► service worker ──connectNative──► host ──► yt-dlp ──► ~/Downloads[/subfolder]
+popup ◄──streamProgress (kind: companion)── service worker ◄── progress/done/error ──┘
+```
+
+- One port per download; closing it (or **Cancel**) terminates yt-dlp.
+- The host accepts only YouTube URLs, passes the URL after `--` so it cannot be read as an option, and rejects subfolders containing `..` or absolute paths.
+- Quality maps to a yt-dlp format selector; with ffmpeg it merges best video+audio into MP4, without ffmpeg it uses single-file formats.
+- Files are written by yt-dlp, not `chrome.downloads`; the popup shows the saved path.
+- `scripts/package.sh --store` removes `nativeMessaging` from `optional_permissions`, which hides and disables the feature.
+
+See [companion/README.md](../companion/README.md) for setup and the message protocol.
+
 ## Regression coverage
 
-`tests/` exercises actual popup and worker modules in isolated Node VM realms, with Chrome API/DOM doubles and deterministic fetch fixtures. It checks saved blob bytes, per-frame messaging, iframe ownership, signed URLs, pause/resume/cancel, AES-128 initialization, and DASH offsets. See `tests/README.md` for scope, release-package reproduction, and real-browser gaps.
+`tests/` exercises actual popup and worker modules in isolated Node VM realms, with Chrome API/DOM doubles and deterministic fetch fixtures. It checks saved blob bytes, per-frame messaging, iframe ownership, signed URLs, pause/resume/cancel, AES-128 initialization, DASH offsets, sender trust, Bearer scoping, separate HLS audio (TS and muxed fMP4), multi-period DASH re-timing, audio language choice, job release/reattach, the companion message flow, the Python host (with a fake yt-dlp), and store packaging. See `tests/README.md` for scope, release-package reproduction, and real-browser gaps.

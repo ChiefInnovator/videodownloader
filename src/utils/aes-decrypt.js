@@ -77,31 +77,3 @@ export function ivFromHex(hexStr) {
   }
   return bytes.buffer;
 }
-
-/**
- * Fetch an AES-128 key from a URI, optionally with auth headers.
- *
- * @param {string}      keyUri
- * @param {HeadersInit} [headers={}]
- * @returns {Promise<ArrayBuffer>} — the raw 16-byte key
- */
-export async function fetchKey(keyUri, headers = {}) {
-  const res = await fetch(keyUri, {
-    headers,
-    credentials: 'include',
-  });
-
-  if (!res.ok) {
-    const hint = res.status === 401 || res.status === 403
-      ? ' (authentication required — session may have expired)'
-      : '';
-    throw new Error(`Key fetch failed: ${res.status}${hint}`);
-  }
-
-  const buf = await res.arrayBuffer();
-  if (buf.byteLength !== 16) {
-    throw new Error(`Expected 16-byte key, got ${buf.byteLength} bytes`);
-  }
-
-  return buf;
-}
