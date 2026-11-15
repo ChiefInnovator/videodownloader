@@ -60,7 +60,7 @@
   // ── Scanning ──────────────────────────────────────────────────────
 
   /** youtube.com itself (not embeds of it on other sites). */
-  const ON_YOUTUBE = /(^|\.)youtube\.com$/i.test(location.hostname);
+  const ON_YOUTUBE = /^(?:www\.|m\.)?youtube\.com$/i.test(location.hostname);
 
   function scan() {
     // On YouTube only the video being watched is offered. Its player uses
@@ -273,12 +273,13 @@
     if (!/^(?:www\.|m\.)?youtube\.com$/i.test(location.hostname)) return;
     const id = new URLSearchParams(location.search).get('v')
       || /^\/(?:shorts|live)\/([\w-]{11})/.exec(location.pathname)?.[1];
-    if (!id || !/^[\w-]{11}$/.test(id)) return;
-    const url = `https://www.youtube.com/watch?v=${id}`;
-    // SPA navigation keeps this content script alive; drop the previous video.
+    const url = id && /^[\w-]{11}$/.test(id) ? `https://www.youtube.com/watch?v=${id}` : null;
+    // SPA navigation keeps this content script alive; drop the previous video
+    // (also when the new page, e.g. home, has no video at all).
     for (const key of foundIframes.keys()) {
       if (key.startsWith('https://www.youtube.com/watch?v=') && key !== url) foundIframes.delete(key);
     }
+    if (!url) return;
     foundIframes.set(url, {
       url,
       type: 'iframe-embed',

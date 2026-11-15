@@ -576,6 +576,10 @@ test('on youtube.com only the watched video is offered, not sidebar links or thu
   assert.equal(iframes[0].url, 'https://www.youtube.com/watch?v=qCE5A2bWZz8');
   assert.equal(iframes[0].title, "OpenAI's New AI Is Too Powerful To Release");
 
+  // Other YouTube subdomains keep the normal scan.
+  const music = await runDetector('https://music.youtube.com/watch?v=qCE5A2bWZz8', { elements });
+  assert.ok(music.iframes.length > 1);
+
   // Other sites still surface YouTube links and thumbnails.
   const elsewhere = await runDetector('https://blog.example/post', { elements });
   assert.ok(elsewhere.iframes.length > 1);
@@ -589,5 +593,7 @@ test('companion turns common yt-dlp refusals into plain guidance', async () => {
   assert.match(friendlyError('ERROR: [youtube] abc: Sign in to confirm your age. This video may be inappropriate for some users.'), /age-restricted/);
   assert.match(friendlyError("[youtube] abc: Sign in to confirm you're not a bot"), /sign-in check/);
   assert.equal(friendlyError('[youtube] abc: Private video. Sign in if you have been granted access'), 'This video is private.');
+  assert.match(friendlyError("[youtube] abc: This content isn't available in your country"), /your region/);
+  assert.match(friendlyError('[youtube] abc: The uploader has not made this video available in your country'), /your region/);
   assert.equal(friendlyError('[youtube] abc: Some new failure'), 'Some new failure');
 });

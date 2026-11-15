@@ -97,7 +97,7 @@ export function friendlyError(raw) {
     [/private video/i, 'This video is private.'],
     [/video unavailable|has been removed|no longer available/i, 'This video is unavailable.'],
     [/premieres in|live event will begin|is upcoming/i, "This video hasn't started yet."],
-    [/not available in your country|geo.?restrict/i, "This video isn't available in your region."],
+    [/(?:not|n['’]t)\b[^.]*available in your (?:country|region)|geo.?restrict/i, "This video isn't available in your region."],
   ];
   for (const [re, message] of rules) if (re.test(text)) return message;
   return text || raw;
