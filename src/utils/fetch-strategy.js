@@ -22,21 +22,17 @@
 // ── Auth scoping ────────────────────────────────────────────────────
 
 /**
- * Registrable-domain approximation without a public-suffix list: the last
- * two labels, or three when the second-level label is a short country
- * SLD ("co.uk", "com.au").
+ * True when `url` is the embed's own origin or an https subdomain of the
+ * embed's host. Sibling hosts are excluded on purpose: without a public-
+ * suffix list, "same last two labels" would trust unrelated tenants
+ * (victim.github.io vs attacker.github.io).
  */
-function siteOf(hostname) {
-  const labels = hostname.toLowerCase().split('.');
-  if (labels.length <= 2) return labels.join('.');
-  const take = labels.at(-1).length === 2 && labels.at(-2).length <= 3 ? 3 : 2;
-  return labels.slice(-take).join('.');
-}
-
-/** True when `url` is on the same site as `origin`. */
-export function sameSite(url, origin) {
+export function isAuthTarget(url, origin) {
   try {
-    return siteOf(new URL(url).hostname) === siteOf(new URL(origin).hostname);
+    const u = new URL(url);
+    const o = new URL(origin);
+    if (u.origin === o.origin) return true;
+    return u.protocol === 'https:' && u.hostname.endsWith(`.${o.hostname}`);
   } catch {
     return false;
   }
@@ -44,12 +40,12 @@ export function sameSite(url, origin) {
 
 /**
  * Embed-derived headers (a Bearer token from the iframe URL) only go back
- * to the site that issued them — never to third-party CDNs or key servers.
+ * to the host that issued them — never to third-party CDNs or key servers.
  */
 function authHeadersFor(url, ctx) {
   const headers = ctx.authHeaders || {};
   if (!ctx.authOrigin || !Object.keys(headers).length) return {};
-  return sameSite(url, ctx.authOrigin) ? headers : {};
+  return isAuthTarget(url, ctx.authOrigin) ? headers : {};
 }
 
 // ── Strategy definitions ────────────────────────────────────────────

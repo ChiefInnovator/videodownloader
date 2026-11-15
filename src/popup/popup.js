@@ -575,7 +575,10 @@ async function expandDashQualities(video, itemId, tabId) {
 
     const reps = result?.video || [];
     // Separate audio track → offer an audio-only download (.m4a, no re-encoding)
-    const audio = reps.length > 0 ? (result?.audio || [])[0] : null;
+    const audioList = result?.audio || [];
+    const audio = reps.length > 0
+      ? audioList.find(a => a.id === result?.preferredAudioId) || audioList[0] || null
+      : null;
     if (reps.length + (audio ? 1 : 0) <= 1) {
       select.remove();
       return;

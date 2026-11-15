@@ -489,7 +489,10 @@ async function expandDash(mpdUrl, authHeaders = {}, tabId = null, authOrigin = n
     if (!isDashManifest(body)) return { video: [], audio: [] };
 
     const { video, audio, hasDrm, periods } = parseMpd(body, mpdUrl);
-    return { video, audio, hasDrm, periodCount: periods.length };
+    // The audio track a combined download would use, so "Audio only"
+    // offers the same (language-matched) track.
+    const preferredAudioId = pickAudioRepresentation(audio, uiLanguage())?.id ?? null;
+    return { video, audio, hasDrm, periodCount: periods.length, preferredAudioId };
   } catch {
     return { video: [], audio: [] };
   }
@@ -563,8 +566,9 @@ function sendStreamProgress(job) {
 }
 
 /** Run a segment job; resolves with whatever `save(blob)` returns. */
-function runSegmentJob({ jobId, segments, outputExt, fetchers, assemble = null, meta, save }) {
+function runSegmentJob({ jobId, segments, outputExt, fetchers, assemble = null, meta, save, onJobStarted }) {
   return new Promise((resolve, reject) => {
+    Promise.resolve().then(() => onJobStarted?.()); // after the job registers below
     startSegmentDownload({
       jobId,
       segments,
@@ -628,7 +632,7 @@ function hlsAudioExt(playlist) {
 async function downloadHlsStream(opts) {
   const {
     variantUrl, masterUrl = null, authHeaders = {}, authOrigin = null,
-    filename, tabId, jobId, sourceUrl = variantUrl,
+    filename, tabId, jobId, sourceUrl = variantUrl, onJobStarted,
   } = opts;
 
   const frameId = frameIdForUrl(tabId, variantUrl) ?? (masterUrl ? frameIdForUrl(tabId, masterUrl) : null);
@@ -709,6 +713,7 @@ async function downloadHlsStream(opts) {
     outputExt: ext,
     fetchers,
     assemble,
+    onJobStarted,
     meta: { sourceUrl, filename: finalFilename, kind: 'stream' },
     save: async (blob) => {
       const downloadId = await saveBlob(blob, finalFilename, tabId);
@@ -733,7 +738,7 @@ async function downloadHlsStream(opts) {
 async function downloadDashStream(opts) {
   const {
     representationId, mpdUrl, authHeaders = {}, authOrigin = null,
-    filename, tabId, jobId, sourceUrl = mpdUrl,
+    filename, tabId, jobId, sourceUrl = mpdUrl, onJobStarted,
   } = opts;
 
   const frameId = frameIdForUrl(tabId, mpdUrl);
@@ -803,6 +808,7 @@ async function downloadDashStream(opts) {
     segments,
     outputExt: ext,
     fetchers,
+    onJobStarted,
     meta: { sourceUrl, filename: finalFilename, kind: 'stream' },
     assemble: (buffers) => {
       const trackData = layout.map(l => ({
@@ -846,10 +852,33 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   return true; // async
 });
 
+/** Source URLs whose download is being set up (manifest fetches in flight). */
+const reservedSources = new Set();
+
 function activeJobFor(sourceUrl) {
   if (!sourceUrl) return null;
+  if (reservedSources.has(sourceUrl)) return { sourceUrl, state: 'starting' };
   return [...listJobs(), ...listCompanionJobs()].find(j =>
     j.sourceUrl === sourceUrl && (j.state === 'running' || j.state === 'paused')) || null;
+}
+
+/**
+ * Claim `sourceUrl` synchronously, before any await, so two concurrent
+ * requests cannot both pass the duplicate check. Released once the job is
+ * registered (or setup fails); the job itself then blocks duplicates.
+ */
+async function withReservedSource(sourceUrl, message, start) {
+  if (activeJobFor(sourceUrl)) throw new Error(message);
+  reservedSources.add(sourceUrl);
+  let released = false;
+  const release = () => {
+    if (!released) { released = true; reservedSources.delete(sourceUrl); }
+  };
+  try {
+    return await start(release);
+  } finally {
+    release();
+  }
 }
 
 async function handleMessage(msg) {
@@ -900,7 +929,6 @@ async function handleMessage(msg) {
     case 'downloadStream': {
       const jobId = msg.jobId || `stream_${Date.now()}`;
       const sourceUrl = msg.sourceUrl || msg.url;
-      if (activeJobFor(sourceUrl)) throw new Error('This stream is already downloading');
       const common = {
         authHeaders: msg.authHeaders || {},
         authOrigin: msg.authOrigin || null,
@@ -910,11 +938,16 @@ async function handleMessage(msg) {
         sourceUrl,
       };
 
-      if (msg.streamType === 'dash') {
-        return downloadDashStream({ ...common, representationId: msg.representationId, mpdUrl: msg.url });
-      }
-      // Default to HLS
-      return downloadHlsStream({ ...common, variantUrl: msg.url, masterUrl: msg.masterUrl || null });
+      return withReservedSource(sourceUrl, 'This stream is already downloading', (release) => {
+        // Release the reservation once the segment job exists (it then
+        // blocks duplicates itself); the promise resolves only after saving.
+        const onJobStarted = release;
+        if (msg.streamType === 'dash') {
+          return downloadDashStream({ ...common, onJobStarted, representationId: msg.representationId, mpdUrl: msg.url });
+        }
+        // Default to HLS
+        return downloadHlsStream({ ...common, onJobStarted, variantUrl: msg.url, masterUrl: msg.masterUrl || null });
+      });
     }
 
     case 'pauseStream': {
@@ -952,19 +985,20 @@ async function handleMessage(msg) {
 
     case 'companionDownload': {
       const jobId = msg.jobId || `yt_${Date.now()}`;
-      if (activeJobFor(msg.url)) throw new Error('This video is already downloading');
-      const { downloadPath, ytCookiesFromBrowser } = await chrome.storage.sync.get({
-        downloadPath: '', ytCookiesFromBrowser: false,
-      });
-      return startCompanionDownload({
-        jobId,
-        url: msg.url,
-        quality: msg.quality,
-        subfolder: downloadPath,
-        cookiesFromBrowser: ytCookiesFromBrowser,
-        onProgress: (job) => {
-          chrome.runtime.sendMessage({ action: 'streamProgress', ...job, jobId: job.id }).catch(() => {});
-        },
+      return withReservedSource(msg.url, 'This video is already downloading', async () => {
+        const { downloadPath, ytCookiesFromBrowser } = await chrome.storage.sync.get({
+          downloadPath: '', ytCookiesFromBrowser: false,
+        });
+        return startCompanionDownload({
+          jobId,
+          url: msg.url,
+          quality: msg.quality,
+          subfolder: downloadPath,
+          cookiesFromBrowser: ytCookiesFromBrowser,
+          onProgress: (job) => {
+            chrome.runtime.sendMessage({ action: 'streamProgress', ...job, jobId: job.id }).catch(() => {});
+          },
+        });
       });
     }
 

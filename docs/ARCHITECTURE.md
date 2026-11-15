@@ -64,7 +64,7 @@ Long-lived Manifest V3 service worker — the central coordinator:
   4. Detects DRM indicators (Widevine/PlayReady/FairPlay UUIDs).
   YouTube URLs are not resolved; they are routed to the companion instead.
 - **Message trust** — only the extension's own pages (popup, options) may send it commands: messages from content scripts (`sender.tab` set) or other extensions are answered with `Forbidden`.
-- **Authentication forwarding** — extracts JWT tokens from iframe URL query parameters into an `Authorization: Bearer` header that is sent only to the embed's own site (same registrable domain, approximated without a public-suffix list). Cookies are never copied into headers (`Cookie` is a forbidden fetch header); fetches use `credentials: 'include'` or run inside the player's frame.
+- **Authentication forwarding** — extracts JWT tokens from iframe URL query parameters into an `Authorization: Bearer` header that is sent only to the embed's own origin or https subdomains of its host (never sibling hosts, which could be unrelated tenants of a shared suffix). Cookies are never copied into headers (`Cookie` is a forbidden fetch header); fetches use `credentials: 'include'` or run inside the player's frame.
 - **HLS expansion** — fetches M3U8 master playlists, parses variants, and probes the first variant for AES-128 encryption, DRM, and live status (no `#EXT-X-ENDLIST`).
 - **DASH expansion** — fetches MPD manifests and parses them via `dash-parser.js`; the picker lists the primary (longest) period's representations.
 - **Stream download orchestration** — coordinates the segment downloader for HLS and DASH:
@@ -163,7 +163,7 @@ Results from all layers are merged and deduplicated by URL before display.
 Enterprise video platforms gate access behind authentication. The extension propagates auth context by:
 
 1. **URL query parameters** — extracts tokens from `at=`, `token=`, `jwt=`, `access_token=`, etc. in the iframe src and builds `Authorization: Bearer <jwt>`.
-2. **Site scoping** — that header is attached only to fetches on the embed's own site; third-party CDNs and key servers never see it.
+2. **Site scoping** — that header is attached only to fetches on the embed's own origin or https subdomains of its host; third-party CDNs and key servers never see it.
 3. **Browser cookies** — fetches use `credentials: 'include'` (or run in the page/player frame), so the browser applies its own cookies. The extension does not read cookies and has no `cookies` permission.
 
 Tokens are held in memory only — never persisted to storage.

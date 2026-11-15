@@ -83,20 +83,29 @@ test('messages from content scripts or other extensions are refused; getAuthHead
   assert.equal((await h.dispatch({ action: 'getAuthHeaders', url: 'https://x.example/' })).error, 'Unknown action');
 });
 
-test('embed Bearer token reaches the embed site only, never a third-party CDN', async () => {
+test('embed Bearer token reaches the embed host and its subdomains only', async () => {
   const h = await harness();
-  const url = 'https://media.player.example/v.m3u8';
-  h.routes.set(url, '#EXTM3U\n#EXTINF:1,\nhttps://cdn.thirdparty.example/a.ts\n#EXTINF:1,\nhttps://edge.player.example/b.ts\n#EXT-X-ENDLIST');
-  h.routes.set('https://cdn.thirdparty.example/a.ts', new Uint8Array([1]));
-  h.routes.set('https://edge.player.example/b.ts', new Uint8Array([2]));
+  const url = 'https://player.example/v.m3u8';
+  h.routes.set(url, '#EXTM3U\n#EXTINF:1,\nhttps://cdn.thirdparty.example/a.ts\n#EXTINF:1,\nhttps://edge.player.example/b.ts\n' +
+    '#EXTINF:1,\nhttps://evil.example/c.ts\n#EXTINF:1,\nhttps://player.example/d.ts\n#EXT-X-ENDLIST');
+  for (const [u, b] of [['https://cdn.thirdparty.example/a.ts', 1], ['https://edge.player.example/b.ts', 2], ['https://evil.example/c.ts', 3], ['https://player.example/d.ts', 4]]) {
+    h.routes.set(u, new Uint8Array([b]));
+  }
   const result = await h.dispatch({
     action: 'downloadStream', tabId: 7, url, jobId: 'auth',
-    authHeaders: { Authorization: 'Bearer secret.jwt.token' }, authOrigin: 'https://www.player.example',
+    authHeaders: { Authorization: 'Bearer secret.jwt.token' }, authOrigin: 'https://player.example',
   });
   assert.equal(result.error, undefined);
   const headersFor = (u) => h.requests.find(r => r.url === u)?.opts.headers || {};
   assert.equal(headersFor('https://cdn.thirdparty.example/a.ts').Authorization, undefined);
+  assert.equal(headersFor('https://evil.example/c.ts').Authorization, undefined);
   assert.equal(headersFor('https://edge.player.example/b.ts').Authorization, 'Bearer secret.jwt.token');
+  assert.equal(headersFor('https://player.example/d.ts').Authorization, 'Bearer secret.jwt.token');
+
+  // Sibling tenants under a shared suffix are not trusted.
+  const fs = await h.utils('fetch-strategy');
+  assert.equal(fs.isAuthTarget('https://attacker.github.io/x.m3u8', 'https://victim.github.io'), false);
+  assert.equal(fs.isAuthTarget('http://cdn.player.example/x', 'https://player.example'), false);
   assert.ok(h.requests.every(r => !r.opts?.headers?.Cookie), 'no hand-built Cookie headers');
 });
 
@@ -129,6 +138,24 @@ test('running jobs are listed by source URL, duplicates refused, finished jobs r
   assert.equal((await done).error, undefined);
   assert.equal((await h.dispatch({ action: 'getStreamJobState', jobId: 'j1' })).job, null);
   assert.equal((await h.dispatch({ action: 'getStreamJobs' })).jobs.length, 0);
+});
+
+test('concurrent requests for one stream start only one download', async () => {
+  const h = await harness();
+  const url = 'https://race.example/v.m3u8';
+  let releaseManifest;
+  h.routes.set(url, () => new Promise(r => { releaseManifest = () => r('#EXTM3U\n#EXTINF:1,\na.ts\n#EXT-X-ENDLIST'); }));
+  h.routes.set('https://race.example/a.ts', new Uint8Array([5]));
+  const first = h.dispatch({ action: 'downloadStream', tabId: 7, url, sourceUrl: url, jobId: 'r1' });
+  const second = await h.dispatch({ action: 'downloadStream', tabId: 7, url, sourceUrl: url, jobId: 'r2' });
+  assert.match(second.error, /already downloading/);
+  await waitFor(() => releaseManifest);
+  releaseManifest();
+  assert.equal((await first).error, undefined);
+  assert.equal(h.downloads.length, 1);
+  // Once finished, the same stream can be downloaded again.
+  h.routes.set(url, '#EXTM3U\n#EXTINF:1,\na.ts\n#EXT-X-ENDLIST');
+  assert.equal((await h.dispatch({ action: 'downloadStream', tabId: 7, url, sourceUrl: url, jobId: 'r3' })).error, undefined);
 });
 
 test('expandHls reports live playlists', async () => {
@@ -221,6 +248,9 @@ test('DASH audio follows the browser language, then the main role', async () => 
   const fetched = h.requests.map(r => r.url).filter(Boolean);
   assert.ok(fetched.includes('https://lang.example/a-fr-1.m4s'));
   assert.ok(!fetched.includes('https://lang.example/a-en-1.m4s'));
+
+  const expanded = await h.dispatch({ action: 'expandDash', tabId: 7, url: mpdUrl });
+  assert.equal(expanded.preferredAudioId, 'a-fr', 'Audio only offers the language-matched track');
 
   const parser = await h.utils('dash-parser');
   const audio = [{ lang: 'en', role: '' }, { lang: 'de', role: 'main' }];

@@ -21,7 +21,7 @@ Detect, extract, and download video content from web pages for offline viewing �
 - Quality selection for multi-variant HLS and multi-representation DASH
 - One-click download with real-time segment-level progress tracking
 - **Pause/resume/cancel** for stream assembly downloads; reopening the popup reconnects to downloads still running and blocks starting the same one twice
-- **Authentication forwarding** — fetches run with the browser's own cookies (`credentials: 'include'`, or inside the player frame); JWT tokens from an embed URL are sent as `Authorization: Bearer` only to that embed's own site
+- **Authentication forwarding** — fetches run with the browser's own cookies (`credentials: 'include'`, or inside the player frame); JWT tokens from an embed URL are sent as `Authorization: Bearer` only to that embed's host and its subdomains
 - **DRM detection** — warns users when Widevine/PlayReady/FairPlay (incl. `skd://` and DRM `KEYFORMAT`s) or Adobe Access prevents download
 - Clean dark-themed popup UI with video thumbnails and metadata
 - Configurable preferred quality and download subfolder
@@ -152,7 +152,7 @@ The [Release workflow](.github/workflows/release.yml) packages the extension and
 - **DRM-protected content** (Widevine/PlayReady/FairPlay) is detected and flagged but cannot be downloaded
 - **Cross-origin iframes** are resolved via embed page parsing and network interception (not DOM access)
 - **CORS-restricted manifests** may prevent quality expansion; the top-level URL still works
-- **Authenticated streams** require an active session — the browser's cookies are used as-is, and iframe-URL tokens go only to the embed's site
+- **Authenticated streams** require an active session — the browser's cookies are used as-is, and iframe-URL tokens go only to the embed's host and its subdomains
 - **TS output** — classic (MPEG-TS) HLS streams are saved as `.ts` files; use VLC/mpv for playback or ffmpeg for MP4 conversion. fMP4/CMAF HLS saves as `.mp4`
 - **Separate HLS audio with TS video** is saved as two files (video `.ts` + `(audio)` file); only fMP4/CMAF streams are muxed into one MP4
 - **Live HLS** — only the segments currently in the playlist window are captured; the popup marks these streams **LIVE**
