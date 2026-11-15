@@ -154,7 +154,16 @@ export async function startCompanionDownload({ jobId, url, quality, subfolder = 
       settle(reject, new Error(job.error));
     });
 
-    port.postMessage({ type: 'download', url: watchUrl, quality, subfolder, cookiesFromBrowser: !!cookiesFromBrowser });
+    try {
+      port.postMessage({ type: 'download', url: watchUrl, quality, subfolder, cookiesFromBrowser: !!cookiesFromBrowser });
+    } catch (err) {
+      // Host exited before we could send: don't leave a phantom running job.
+      job.state = 'error';
+      job.error = err.message || 'Could not reach the companion app';
+      report();
+      settle(reject, new Error(job.error));
+      return;
+    }
     report();
   });
 }

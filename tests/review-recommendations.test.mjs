@@ -322,6 +322,16 @@ test('YouTube embeds do not resolve to manifests; companion downloads relay prog
   assert.deepEqual(progress.map(m => m.state), ['running', 'running', 'complete']);
   assert.equal(progress[1].percent, 50);
   assert.ok(port.disconnected);
+
+  // A host that dies before the download message is sent leaves no stuck job.
+  h.chrome.runtime.connectNative = () => {
+    const dead = nativePortDouble(() => {});
+    dead.postMessage = () => { throw new Error('Attempting to use a disconnected port object'); };
+    return dead;
+  };
+  const failed = await h.dispatch({ action: 'companionDownload', url: 'https://youtu.be/jNQXAC9IVRw', quality: 'best', jobId: 'yt2' });
+  assert.match(failed.error, /disconnected port/);
+  assert.equal((await h.dispatch({ action: 'getStreamJobs' })).jobs.length, 0);
 });
 
 test('companion host speaks native messaging, rejects non-YouTube URLs, and cancels', { skip: !hasPython() }, async () => {
