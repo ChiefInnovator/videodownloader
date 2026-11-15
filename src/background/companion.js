@@ -41,7 +41,7 @@ export async function companionSettings() {
 
 function connect() {
   if (typeof chrome.runtime.connectNative !== 'function') {
-    throw new Error('Native messaging is not available yet — reload the extension after enabling the companion');
+    throw new Error('Native messaging is not available yet — reload the extension after enabling Enhanced Downloader');
   }
   return chrome.runtime.connectNative(COMPANION_HOST);
 }
@@ -53,7 +53,7 @@ function connect() {
 export async function probeCompanion(timeoutMs = 5000) {
   const settings = await companionSettings();
   if (!settings.supported) return { available: false, error: 'Not available in this build' };
-  if (!settings.enabled || !settings.permitted) return { available: false, error: 'Companion is turned off in Settings' };
+  if (!settings.enabled || !settings.permitted) return { available: false, error: 'Enhanced Downloader is turned off in Settings' };
 
   return new Promise((resolve) => {
     let port;
@@ -62,7 +62,7 @@ export async function probeCompanion(timeoutMs = 5000) {
       try { port?.disconnect(); } catch { /* already closed */ }
       resolve(result);
     };
-    const timer = setTimeout(() => finish({ available: false, error: 'Companion did not respond' }), timeoutMs);
+    const timer = setTimeout(() => finish({ available: false, error: 'Enhanced Downloader did not respond' }), timeoutMs);
     try {
       port = connect();
     } catch (err) {
@@ -76,7 +76,7 @@ export async function probeCompanion(timeoutMs = 5000) {
         : { available: false, error: msg.error || 'yt-dlp not found' });
     });
     port.onDisconnect.addListener(() => {
-      finish({ available: false, error: chrome.runtime.lastError?.message || 'Companion app not installed' });
+      finish({ available: false, error: chrome.runtime.lastError?.message || 'Enhanced Downloader helper not installed' });
     });
     port.postMessage({ type: 'probe' });
   });
@@ -99,10 +99,10 @@ function publicCompanionJob(job) {
 export async function startCompanionDownload({ jobId, url, quality, subfolder = '', cookiesFromBrowser = false, onProgress }) {
   const settings = await companionSettings();
   if (!settings.supported || !settings.enabled || !settings.permitted) {
-    throw new Error('Turn on the companion app in Settings to download YouTube videos');
+    throw new Error('Turn on Enhanced Downloader in Settings to download this video');
   }
   const watchUrl = isYouTubeUrl(url) ? youTubeWatchUrl(url) : null;
-  if (!watchUrl) throw new Error('Not a YouTube video URL');
+  if (!watchUrl) throw new Error('Enhanced Downloader does not support this video');
   if (!COMPANION_QUALITIES.includes(quality)) quality = 'best';
   for (const job of jobs.values()) {
     if (job.sourceUrl === url && job.state === 'running') throw new Error('This video is already downloading');
@@ -150,7 +150,7 @@ export async function startCompanionDownload({ jobId, url, quality, subfolder = 
     port.onDisconnect.addListener(() => {
       if (settled) return;
       job.state = 'error';
-      job.error = chrome.runtime.lastError?.message || 'Companion app closed unexpectedly';
+      job.error = chrome.runtime.lastError?.message || 'Enhanced Downloader helper closed unexpectedly';
       report();
       settle(reject, new Error(job.error));
     });
@@ -160,7 +160,7 @@ export async function startCompanionDownload({ jobId, url, quality, subfolder = 
     } catch (err) {
       // Host exited before we could send: don't leave a phantom running job.
       job.state = 'error';
-      job.error = err.message || 'Could not reach the companion app';
+      job.error = err.message || 'Could not reach the Enhanced Downloader helper';
       report();
       settle(reject, new Error(job.error));
       return;

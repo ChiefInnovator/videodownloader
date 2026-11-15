@@ -4,7 +4,7 @@
 
 ## Overview
 
-Video Downloader is a Chrome Manifest V3 extension with six main components, plus an optional native companion for YouTube (see [YouTube companion](#youtube-companion-optional)):
+Video Downloader is a Chrome Manifest V3 extension with six main components, plus an optional native helper, Enhanced Downloader (see [Enhanced Downloader](#enhanced-downloader-optional-companion)):
 
 ```text
 ┌─────────────┐     messages     ┌──────────────────────┐
@@ -88,7 +88,7 @@ Rendered when the user clicks the extension icon:
 - Each detected video has a **Copy link** button (`navigator.clipboard`) for its direct or manifest URL.
 - Transitions and animations are disabled under `prefers-reduced-motion: reduce`.
 - For stream downloads: shows segment-level progress (e.g., "Segment 42/128 (33%) — 2.4 MB/s — 1m left") with **Pause**, **Resume**, and **Cancel** controls. On open it asks for `getStreamJobs` and reconnects cards to downloads still running. Live HLS gets a **LIVE** badge.
-- YouTube entries (embeds, thumbnails, links, or the youtube.com watch page itself) render as **YOUTUBE** cards: with the companion connected they offer Best / 1080p / 720p / 480p / Audio only and a Download button; otherwise they explain that the companion is needed and link to Settings.
+- YouTube entries (embeds, thumbnails, links, or the youtube.com watch page itself) render as **ENHANCED** cards: with the companion connected they offer Best / 1080p / 720p / 480p / Audio only and a Download button; otherwise they explain that the companion is needed and link to Settings.
 - For direct downloads: shows byte-level progress via `chrome.downloads` polling.
 
 ### 4. Options Page (`src/options/`)
@@ -99,7 +99,7 @@ Persists user preferences to `chrome.storage.sync`:
 | ------- | ------- |
 | `defaultQuality` | Preselect the best stream quality at or below this height |
 | `downloadPath` | Subfolder within Chrome's download directory (also used by the companion under `~/Downloads`) |
-| `companionEnabled` | YouTube via the companion app; toggling it requests/removes the optional `nativeMessaging` permission |
+| `companionEnabled` | Enhanced Downloader (YouTube via the companion helper); toggling it requests/removes the optional `nativeMessaging` permission |
 | `ytCookiesFromBrowser` | Pass `--cookies-from-browser chrome` to yt-dlp |
 
 The companion section only appears when the build declares `nativeMessaging` in `optional_permissions` (not in the store build).
@@ -185,6 +185,7 @@ Tokens are held in memory only — never persisted to storage.
 | **Live HLS** | Detected (no `#EXT-X-ENDLIST`) and badged **LIVE**; only the segments in the current playlist window are captured. |
 | **Multi-period DASH** | Periods are stitched and re-timed; a later period whose codec configuration differs from the first period's init segment may not play correctly. |
 | **Large streams** | Segments are held in worker memory until assembly; a job's buffers are released as soon as it completes or fails. |
+| **SharePoint / OneDrive Stream** | Playback segments come from `…/oneDrive.transcode?part=initsegment\|mediasegment&enableEncryption=1` with each response payload encrypted (not standard CENC/AES-128), so they are not assembled; query-identified segments (`part=…segment`, `segmentTime=`) are filtered from the list. On `/_layouts/15/stream.aspx?id=<server-relative path>` the detector offers `<site>/_layouts/15/download.aspx?SourceUrl=<path>`, where `<site>` is the page path before `/_layouts/15/` (root, site, or nested subsite) and the file must live under it, SharePoint's original-file download, which enforces the viewer's download permission. |
 | **YouTube** | Not extracted by the extension; only via the optional companion. `googlevideo.com` chunk requests are ignored. |
 | **TS output format** | MPEG-TS HLS streams produce `.ts` files (fMP4 HLS produces `.mp4`). Most players (VLC, mpv) handle these natively. Convert to MP4 with `ffmpeg -i video.ts -c copy video.mp4`. |
 
@@ -199,7 +200,7 @@ Tokens are held in memory only — never persisted to storage.
 - Content script uses a guard variable to prevent double-injection.
 - AES-128 decryption uses the Web Crypto API — no custom crypto implementations.
 
-## YouTube companion (optional)
+## Enhanced Downloader (optional companion)
 
 `companion/videodownloader_host.py` is a Chrome native-messaging host (Python 3 standard library) registered as `com.inventingfire.videodownloader` by `companion/install.sh` / `install.ps1`, with `allowed_origins` set to this extension's ID.
 

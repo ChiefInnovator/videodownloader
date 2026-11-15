@@ -4,7 +4,7 @@
 
 Built by **Rich Crane** — Microsoft MVP, Founder & Chief AI Officer at MILL5. Part of the **Inventing Fire with AI** initiative.
 
-Detect, extract, and download video content from web pages for offline viewing — including cross-origin iframe embeds and AES-128 encrypted HLS/DASH streams. No analytics. No telemetry. No accounts. Nothing leaves your browser except the segment fetches required to download the video you selected. YouTube is available only through the optional [companion app](companion/README.md), which hands the video URL to yt-dlp on your computer.
+Detect, extract, and download video content from web pages for offline viewing — including cross-origin iframe embeds and AES-128 encrypted HLS/DASH streams. No analytics. No telemetry. No accounts. Nothing leaves your browser except the segment fetches required to download the video you selected. YouTube videos are available through the optional [Enhanced Downloader](companion/README.md) helper, which hands the YouTube URL to yt-dlp on your computer.
 
 ## Features
 
@@ -25,10 +25,11 @@ Detect, extract, and download video content from web pages for offline viewing �
 - **DRM detection** — warns users when Widevine/PlayReady/FairPlay (incl. `skd://` and DRM `KEYFORMAT`s) or Adobe Access prevents download
 - Clean dark-themed popup UI with video thumbnails and metadata
 - Configurable preferred quality and download subfolder
-- **YouTube via companion app (optional)** — a native-messaging helper wrapping [yt-dlp](https://github.com/yt-dlp/yt-dlp); off by default, not included in the Chrome Web Store build — see [companion/README.md](companion/README.md). If the optional Chrome sign-in can't be read, it retries once without it (sign-in-only videos then fail)
+- **Enhanced Downloader (optional)** — a native-messaging helper wrapping [yt-dlp](https://github.com/yt-dlp/yt-dlp); off by default, not included in the Chrome Web Store build — see [companion/README.md](companion/README.md). If the optional Chrome sign-in can't be read, it retries once without it (sign-in-only videos then fail)
 - SPA-compatible via MutationObserver for dynamically loaded content
 - **Session-titled files** — captures each video's session/player title when detected, so playing another video on the same page keeps earlier names intact. Historical streams without a captured title use their URL filename.
 - **Audio only** — DASH streams with a separate audio track offer "Audio only (.m4a)": the original AAC track wrapped as M4A, no re-encoding
+- **SharePoint / OneDrive Stream** — on a `stream.aspx` page the original MP4 is offered as one file through SharePoint's own download (the same file as Stream's Download button; refused by SharePoint if you lack download rights). Stream's per-chunk encrypted playback segments are never listed
 - **Copy link** — copy any detected video's direct or manifest URL (e.g. to open in VLC)
 - **Reduced motion** — the popup honors the OS "reduce motion" setting
 - **Slides download** — detects slide-deck links (PDF/PPT/Key) in any frame, lists them, and downloads them alongside the video
@@ -41,7 +42,7 @@ videodownloader/
 ├── src/
 │   ├── background/
 │   │   ├── service-worker.js         # Network interception, downloads, stream orchestration
-│   │   └── companion.js              # Native-messaging client for the optional YouTube companion
+│   │   └── companion.js              # Native-messaging client for the optional Enhanced Downloader helper
 │   ├── content/
 │   │   └── detector.js               # DOM + iframe scanning, MutationObserver
 │   ├── popup/
@@ -55,10 +56,10 @@ videodownloader/
 │       ├── aes-decrypt.js            # AES-128-CBC decryption (Web Crypto API)
 │       ├── segment-downloader.js     # Segment fetch/decrypt/concat with retry
 │       ├── iframe-resolver.js        # Embed auth-token extraction, embed-page manifest parsing
-│       ├── youtube.js                # YouTube URL helpers (companion routing, chunk filtering)
+│       ├── youtube.js                # YouTube URL helpers (Enhanced Downloader routing, chunk filtering)
 │       ├── platform-resolvers.js     # Embed URL → manifest via Vimeo/Wistia/JW/Mux/Cloudflare/Vidyard/Panopto APIs
 │       └── page-context.js           # Video title + slide-deck links from every frame
-├── companion/                        # Optional YouTube helper: yt-dlp native-messaging host + installers
+├── companion/                        # Enhanced Downloader helper: yt-dlp native-messaging host + installers
 ├── icons/                            # Extension icons (16/48/128px)
 ├── scripts/
 │   ├── generate-icons.js             # Node.js icon generator (no deps)
@@ -158,7 +159,7 @@ The [Release workflow](.github/workflows/release.yml) packages the extension and
 - **Live HLS** — only the segments currently in the playlist window are captured; the popup marks these streams **LIVE**
 - **Memory** — a stream is assembled in memory before saving, so very long high-bitrate downloads need free RAM roughly equal to the file size
 - **No format conversion** — files keep the container they were served in
-- **YouTube** works only through the optional companion app (yt-dlp on your computer); the extension itself never extracts YouTube streams
+- **YouTube** works only through the optional Enhanced Downloader helper (yt-dlp on your computer); the extension itself never extracts YouTube streams
 
 See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for full technical details, detection strategy, and edge cases.
 

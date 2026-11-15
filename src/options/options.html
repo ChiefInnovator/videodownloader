@@ -32,17 +32,17 @@
     </section>
 
     <section id="companion-section" class="companion-section" hidden>
-      <h2>YouTube (companion app)</h2>
+      <h2>Enhanced Downloader</h2>
       <p class="hint">
-        YouTube downloads run through a small helper app on your computer that uses
-        <a href="https://github.com/yt-dlp/yt-dlp" target="_blank" rel="noopener">yt-dlp</a>.
+        Downloads videos the extension can't save on its own, using a small helper app on
+        your computer built on <a href="https://github.com/yt-dlp/yt-dlp" target="_blank" rel="noopener">yt-dlp</a>.
         Files are saved by the helper to your Downloads folder (plus the subfolder above),
         not through Chrome. Only download videos you have the right to keep.
       </p>
       <div class="checkbox-section">
         <label>
           <input id="companionEnabled" type="checkbox">
-          Enable YouTube downloads via the companion app
+          Enable Enhanced Downloader
         </label>
       </div>
       <div class="checkbox-section">
@@ -52,7 +52,9 @@
         </label>
       </div>
       <p class="hint">
-        Setup: install yt-dlp (and ffmpeg for 1080p and above), then from the companion download run
+        Setup: install yt-dlp (and ffmpeg for 1080p and above). Then, from the folder that
+        contains the <code>companion</code> folder (the extension folder, or the unzipped
+        Enhanced Downloader download), run
         <code id="install-cmd">bash companion/install.sh EXTENSION_ID</code> on macOS/Linux, or on Windows
         <code id="install-cmd-win">powershell -ExecutionPolicy Bypass -File companion\install.ps1 EXTENSION_ID</code>.
       </p>

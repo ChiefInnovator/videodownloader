@@ -1,7 +1,7 @@
-# Video Downloader companion (YouTube)
+# Enhanced Downloader (companion helper)
 
 YouTube video cannot be downloaded by a browser extension alone. This optional
-companion is a small native-messaging host that lets the extension hand a
+Enhanced Downloader is a small native-messaging host that lets the extension hand a
 YouTube URL to [yt-dlp](https://github.com/yt-dlp/yt-dlp) on your computer.
 
 - **Runs outside Chrome.** yt-dlp fetches the video and writes the file to
@@ -30,9 +30,9 @@ YouTube URL to [yt-dlp](https://github.com/yt-dlp/yt-dlp) on your computer.
 2. Register the host:
    - macOS / Linux: `bash companion/install.sh <extension-id>`
    - Windows: `powershell -ExecutionPolicy Bypass -File companion\install.ps1 <extension-id>`
-3. In the extension's **Settings**, tick **Enable YouTube downloads via the
-   companion app**, approve Chrome's permission prompt, and click
-   **Test connection**.
+3. In the extension's **Settings**, under **Enhanced Downloader**, tick
+   **Enable Enhanced Downloader**, approve Chrome's permission prompt, and
+   click **Test connection**.
 
 Keep the companion folder where it is after installing; the registration
 points at it. Re-run the installer if you move the folder or the extension ID

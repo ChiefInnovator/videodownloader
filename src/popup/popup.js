@@ -755,7 +755,7 @@ const YOUTUBE_QUALITIES = [
 function renderYouTubeItem(iframe, idx) {
   const url = youTubeWatchUrl(iframe.url) || iframe.url;
   const itemId = `yt-${idx}`;
-  const title = iframe.title || 'YouTube video';
+  const title = iframe.title || 'Video';
   const li = document.createElement('li');
   li.className = 'video-item stream-item';
   li.innerHTML = `
@@ -766,11 +766,11 @@ function renderYouTubeItem(iframe, idx) {
       </div>
       <div class="video-details">
         <div class="video-title" title="${escapeAttr(title)}">${escapeHtml(truncate(title, 50))}</div>
-        <div class="video-meta"><span class="badge badge-youtube">YOUTUBE</span><span>via companion app</span></div>
+        <div class="video-meta"><span class="badge badge-youtube">ENHANCED</span><span>via Enhanced Downloader</span></div>
       </div>
     </div>
     <div class="video-actions" id="actions-${itemId}">
-      <span class="progress-text">Checking companion app\u2026</span>
+      <span class="progress-text">Checking Enhanced Downloader\u2026</span>
     </div>
     <div class="progress-wrap" id="progress-${itemId}">
       <div class="progress-bar"><div class="progress-bar-fill" id="fill-${itemId}"></div></div>
@@ -788,10 +788,10 @@ function renderYouTubeItem(iframe, idx) {
     if (!actionsEl) return;
     if (!status?.available) {
       const why = !status?.supported
-        ? 'YouTube downloads aren\u2019t available in this build'
+        ? 'Not available in this build'
         : !status.enabled || !status.permitted
-          ? 'YouTube needs the companion app'
-          : `Companion app: ${status.error || 'unavailable'}`;
+          ? 'Needs Enhanced Downloader'
+          : `Enhanced Downloader: ${status.error || 'unavailable'}`;
       actionsEl.innerHTML = `<span class="progress-text">${escapeHtml(why)}</span>` +
         (status?.supported ? '<button type="button" class="btn btn-sm btn-secondary btn-setup">Set up</button>' : '');
       actionsEl.querySelector('.btn-setup')?.addEventListener('click', () => chrome.runtime.openOptionsPage());
