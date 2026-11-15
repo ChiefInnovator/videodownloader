@@ -59,7 +59,17 @@
 
   // ── Scanning ──────────────────────────────────────────────────────
 
+  /** youtube.com itself (not embeds of it on other sites). */
+  const ON_YOUTUBE = /(^|\.)youtube\.com$/i.test(location.hostname);
+
   function scan() {
+    // On YouTube only the video being watched is offered. Its player uses
+    // blob: URLs, and every sidebar/home thumbnail and link would otherwise
+    // be listed as its own "embedded stream".
+    if (ON_YOUTUBE) {
+      scanYouTubeWatchPage();
+      return;
+    }
     scanVideoElements();
     scanSourceElements();
     scanObjectEmbed();
@@ -274,7 +284,8 @@
       type: 'iframe-embed',
       platform: 'www.youtube.com',
       confidence: 'high',
-      title: document.title.replace(/\s*-\s*YouTube$/, '') || 'Video',
+      // Drop YouTube's "(5) " notification count and " - YouTube" suffix.
+      title: document.title.replace(/^\(\d+\+?\)\s*/, '').replace(/\s*-\s*YouTube$/, '') || 'Video',
       width: null,
       height: null,
     });

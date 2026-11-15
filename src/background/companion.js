@@ -82,6 +82,27 @@ export async function probeCompanion(timeoutMs = 5000) {
   });
 }
 
+const SIGN_IN_HINT = 'If you have access, turn on "Let yt-dlp use your Chrome sign-in" in Settings and try again.';
+
+/**
+ * Plain-language versions of yt-dlp's common refusals. Unknown errors pass
+ * through unchanged.
+ */
+export function friendlyError(raw) {
+  const text = raw.replace(/^ERROR:\s*/, '').replace(/^\[\w+\]\s*[\w-]+:\s*/, '');
+  const rules = [
+    [/members-only|join this channel/i, `This video is for channel members only. ${SIGN_IN_HINT}`],
+    [/confirm your age|age[- ]restricted|inappropriate for some users/i, `This video is age-restricted. ${SIGN_IN_HINT}`],
+    [/not a bot|sign in to confirm/i, `YouTube asked for a sign-in check. ${SIGN_IN_HINT}`],
+    [/private video/i, 'This video is private.'],
+    [/video unavailable|has been removed|no longer available/i, 'This video is unavailable.'],
+    [/premieres in|live event will begin|is upcoming/i, "This video hasn't started yet."],
+    [/not available in your country|geo.?restrict/i, "This video isn't available in your region."],
+  ];
+  for (const [re, message] of rules) if (re.test(text)) return message;
+  return text || raw;
+}
+
 /** Messaging-safe copy of a companion job. */
 function publicCompanionJob(job) {
   const { port, ...rest } = job;
@@ -142,7 +163,7 @@ export async function startCompanionDownload({ jobId, url, quality, subfolder = 
         settle(resolve, { jobId, file: job.file });
       } else if (msg.type === 'error') {
         job.state = msg.cancelled ? 'cancelled' : 'error';
-        job.error = String(msg.error || 'yt-dlp failed');
+        job.error = msg.cancelled ? 'Cancelled' : friendlyError(String(msg.error || 'yt-dlp failed'));
         report();
         settle(reject, new Error(job.error));
       }

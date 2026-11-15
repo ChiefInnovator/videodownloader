@@ -445,7 +445,7 @@ test('Stream oneDrive.transcode chunks (query-identified segments) are not liste
 });
 
 /** Run the real content script against a minimal page double. */
-async function runDetector(href) {
+async function runDetector(href, { title = 'Stream', elements = {} } = {}) {
   const vm = await import('node:vm');
   const { readFile } = await import('node:fs/promises');
   let listener;
@@ -454,7 +454,7 @@ async function runDetector(href) {
   const context = vm.createContext({
     URL, URLSearchParams, JSON, Node: { ELEMENT_NODE: 1 },
     location: loc,
-    document: { title: 'Stream', documentElement: {}, querySelectorAll: () => [], querySelector: () => null },
+    document: { title, documentElement: {}, querySelectorAll: (sel) => elements[sel] || [], querySelector: () => null },
     MutationObserver: class { observe() {} },
     chrome: { runtime: { onMessage: { addListener: (fn) => { listener = fn; } } } },
   });
@@ -563,4 +563,31 @@ test('update check: daily, cookie-less, can be turned off, links only to this re
   const failed = await h.dispatch({ action: 'checkForUpdateNow' });
   assert.ok(failed.error);
   assert.equal(failed.available, false);
+});
+
+test('on youtube.com only the watched video is offered, not sidebar links or thumbnails', async () => {
+  const sidebar = Array.from({ length: 20 }, (_, i) => ({ href: `https://www.youtube.com/watch?v=sidebar${String(i).padStart(4, '0')}`, textContent: `2:15:59Video ${i}`, title: '' }));
+  const thumbs = [{ src: 'https://img.youtube.com/vi/kMdHCyAnNHA/hqdefault.jpg', alt: '' }];
+  const elements = { 'a[href*="youtube.com/watch"]': sidebar, 'img[src*="img.youtube.com/vi/"]': thumbs };
+  const { iframes, videos } = await runDetector('https://www.youtube.com/watch?v=qCE5A2bWZz8',
+    { title: "(5) OpenAI's New AI Is Too Powerful To Release - YouTube", elements });
+  assert.equal(videos.length, 0);
+  assert.equal(iframes.length, 1);
+  assert.equal(iframes[0].url, 'https://www.youtube.com/watch?v=qCE5A2bWZz8');
+  assert.equal(iframes[0].title, "OpenAI's New AI Is Too Powerful To Release");
+
+  // Other sites still surface YouTube links and thumbnails.
+  const elsewhere = await runDetector('https://blog.example/post', { elements });
+  assert.ok(elsewhere.iframes.length > 1);
+});
+
+test('companion turns common yt-dlp refusals into plain guidance', async () => {
+  const h = await harness();
+  const { friendlyError } = await h.utils('../background/companion');
+  assert.match(friendlyError('[youtube] kMdHCyAnNHA: Join this channel to get access to members-only content like this video, and other exclusive perks.'),
+    /channel members only.*Chrome sign-in/);
+  assert.match(friendlyError('ERROR: [youtube] abc: Sign in to confirm your age. This video may be inappropriate for some users.'), /age-restricted/);
+  assert.match(friendlyError("[youtube] abc: Sign in to confirm you're not a bot"), /sign-in check/);
+  assert.equal(friendlyError('[youtube] abc: Private video. Sign in if you have been granted access'), 'This video is private.');
+  assert.equal(friendlyError('[youtube] abc: Some new failure'), 'Some new failure');
 });

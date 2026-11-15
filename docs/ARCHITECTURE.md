@@ -88,7 +88,7 @@ Rendered when the user clicks the extension icon:
 - Each detected video has a **Copy link** button (`navigator.clipboard`) for its direct or manifest URL.
 - Transitions and animations are disabled under `prefers-reduced-motion: reduce`.
 - For stream downloads: shows segment-level progress (e.g., "Segment 42/128 (33%) — 2.4 MB/s — 1m left") with **Pause**, **Resume**, and **Cancel** controls. On open it asks for `getStreamJobs` and reconnects cards to downloads still running. Live HLS gets a **LIVE** badge.
-- YouTube entries (embeds, thumbnails, links, or the youtube.com watch page itself) render as **ENHANCED** cards: with the companion connected they offer Best / 1080p / 720p / 480p / Audio only and a Download button; otherwise they explain that the companion is needed and link to Settings.
+- YouTube entries render as **ENHANCED** cards. On youtube.com only the video being watched is listed (sidebar/home links and thumbnails are ignored); on other sites YouTube embeds, thumbnails and links are listed. Cards: with the companion connected they offer Best / 1080p / 720p / 480p / Audio only and a Download button; otherwise they explain that the companion is needed and link to Settings.
 - For direct downloads: shows byte-level progress via `chrome.downloads` polling.
 
 ### 4. Options Page (`src/options/`)
