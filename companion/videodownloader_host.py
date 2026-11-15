@@ -135,15 +135,21 @@ def format_selector(quality, has_ffmpeg):
 
 
 def output_dir(subfolder):
-    base = os.path.join(os.path.expanduser("~"), "Downloads")
+    root = os.path.realpath(os.path.join(os.path.expanduser("~"), "Downloads"))
+    target = root
     sub = (subfolder or "").strip().strip("/\\")
     if sub:
         parts = re.split(r"[\\/]+", sub)
-        if any(p in ("", ".", "..") for p in parts) or os.path.isabs(sub):
+        # Reject traversal, absolute paths, and Windows drive/stream syntax
+        # ("C:foo" would otherwise join as a drive-relative path).
+        if (any(p in ("", ".", "..") or ":" in p for p in parts)
+                or os.path.isabs(sub) or os.path.splitdrive(sub)[0]):
             raise ValueError("Invalid download subfolder")
-        base = os.path.join(base, *parts)
-    os.makedirs(base, exist_ok=True)
-    return base
+        target = os.path.realpath(os.path.join(root, *parts))
+        if os.path.commonpath([root, target]) != root:
+            raise ValueError("Invalid download subfolder")
+    os.makedirs(target, exist_ok=True)
+    return target
 
 
 def build_command(ytdlp, msg, has_ffmpeg):

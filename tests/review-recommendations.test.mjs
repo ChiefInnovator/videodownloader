@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { spawn, execFileSync } from 'node:child_process';
-import { mkdtempSync, writeFileSync, chmodSync, existsSync } from 'node:fs';
+import { mkdtempSync, writeFileSync, chmodSync, existsSync, realpathSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { harness, root, event } from './harness.mjs';
@@ -334,8 +334,8 @@ test('YouTube embeds do not resolve to manifests; companion downloads relay prog
   assert.equal((await h.dispatch({ action: 'getStreamJobs' })).jobs.length, 0);
 });
 
-test('companion host speaks native messaging, rejects non-YouTube URLs, and cancels', { skip: !hasPython() }, async () => {
-  const dir = mkdtempSync(path.join(tmpdir(), 'vd-host-'));
+test('companion host speaks native messaging, rejects non-YouTube URLs, and cancels', { skip: !hasPython() }, async (t) => {
+  const dir = realpathSync(mkdtempSync(path.join(tmpdir(), 'vd-host-')));
   const fake = path.join(dir, 'fake-yt-dlp');
   writeFileSync(fake, `#!/usr/bin/env python3
 import sys, time
@@ -349,6 +349,7 @@ print('VDFILE ' + sys.argv[sys.argv.index('-P') + 1] + '/clip.mp4', flush=True)
   const host = spawn('python3', [path.join(root, 'companion/videodownloader_host.py')], {
     env: { ...process.env, HOME: dir, VIDEODOWNLOADER_YTDLP: fake },
   });
+  t.after(() => host.kill()); // never leave the host running if an assertion fails
   const replies = [];
   let buf = Buffer.alloc(0);
   host.stdout.on('data', (chunk) => {
@@ -367,8 +368,10 @@ print('VDFILE ' + sys.argv[sys.argv.index('-P') + 1] + '/clip.mp4', flush=True)
   send({ type: 'download', url: 'https://evil.example/--exec=rm' });
   assert.match((await next(r => r.type === 'error')).error, /Only YouTube/);
 
-  send({ type: 'download', url: 'https://www.youtube.com/watch?v=jNQXAC9IVRw', quality: '480', subfolder: '../escape' });
-  assert.match((await next(r => r.type === 'error')).error, /subfolder/);
+  for (const subfolder of ['../escape', 'C:drive-relative', 'a/../../b']) {
+    send({ type: 'download', url: 'https://www.youtube.com/watch?v=jNQXAC9IVRw', quality: '480', subfolder });
+    assert.match((await next(r => r.type === 'error')).error, /subfolder/);
+  }
 
   send({ type: 'download', url: 'https://www.youtube.com/watch?v=jNQXAC9IVRw', quality: '480', subfolder: 'Videos' });
   const progress = await next(r => r.type === 'progress');
