@@ -445,23 +445,32 @@ test('Stream oneDrive.transcode chunks (query-identified segments) are not liste
 });
 
 /** Run the real content script against a minimal page double. */
-async function runDetector(href, { title = 'Stream', elements = {} } = {}) {
+async function runDetector(href, options) {
+  return (await loadDetector(href, options)).ask();
+}
+
+/** Load the content script once; `ask()` re-queries it, `page` can be mutated to simulate SPA navigation. */
+async function loadDetector(href, { title = 'Stream', elements = {} } = {}) {
   const vm = await import('node:vm');
   const { readFile } = await import('node:fs/promises');
   let listener;
   const loc = new URL(href);
   const win = {};
+  const doc = { title, documentElement: {}, querySelectorAll: (sel) => elements[sel] || [], querySelector: () => null };
   const context = vm.createContext({
     URL, URLSearchParams, JSON, Node: { ELEMENT_NODE: 1 },
     location: loc,
-    document: { title, documentElement: {}, querySelectorAll: (sel) => elements[sel] || [], querySelector: () => null },
+    document: doc,
     MutationObserver: class { observe() {} },
     chrome: { runtime: { onMessage: { addListener: (fn) => { listener = fn; } } } },
   });
   win.top = win;
   context.window = win;
   vm.runInContext(await readFile(path.join(root, 'src/content/detector.js'), 'utf8'), context);
-  return new Promise(resolve => listener({ action: 'getVideos' }, {}, resolve));
+  return {
+    ask: () => new Promise(resolve => listener({ action: 'getVideos' }, {}, resolve)),
+    page: { location: loc, document: doc },
+  };
 }
 
 test('SharePoint stream.aspx offers the original file via download.aspx', async () => {
@@ -599,4 +608,26 @@ test('companion turns common yt-dlp refusals into plain guidance', async () => {
   assert.equal(friendlyError('[youtube] abc: This live event will begin in 2 hours.'), "This video hasn't started yet.");
   assert.equal(friendlyError('[youtube] abc: Premieres in 3 days'), "This video hasn't started yet.");
   assert.equal(friendlyError('[youtube] abc: Some new failure'), 'Some new failure');
+});
+
+test('youtube.com SPA navigation replaces the watched video and clears it on pages without one', async () => {
+  const { ask, page } = await loadDetector('https://www.youtube.com/watch?v=qCE5A2bWZz8', { title: 'First - YouTube' });
+  const urls = (list) => list.map(i => i.url).join(' ');
+  assert.equal(urls((await ask()).iframes), 'https://www.youtube.com/watch?v=qCE5A2bWZz8');
+
+  // Watch → another watch page: only the new video remains.
+  page.location.href = 'https://www.youtube.com/watch?v=kMdHCyAnNHA';
+  page.document.title = '(2) Second - YouTube';
+  const second = (await ask()).iframes;
+  assert.equal(urls(second), 'https://www.youtube.com/watch?v=kMdHCyAnNHA');
+  assert.equal(second[0].title, 'Second');
+
+  // Watch → Shorts.
+  page.location.href = 'https://www.youtube.com/shorts/abcDEF12345';
+  assert.equal(urls((await ask()).iframes), 'https://www.youtube.com/watch?v=abcDEF12345');
+
+  // Video → home: nothing is offered any more.
+  page.location.href = 'https://www.youtube.com/';
+  page.document.title = 'YouTube';
+  assert.equal((await ask()).iframes.length, 0);
 });
