@@ -18,7 +18,7 @@ Chrome Manifest V3 extension that detects and downloads video (direct files, HLS
 - **No telemetry, analytics, or accounts.** Nothing leaves the browser except fetches needed for the selected download, plus one disclosed exception: an at-most-daily, cookie-less request to GitHub's releases API for the update indicator (`src/background/update-check.js`, off in Settings). This is the product's core promise; don't add other requests.
 - Don't add npm dependencies or a bundler; keep code loadable as-is via **Load unpacked**.
 - Don't add permissions or host permissions to `manifest.json` without a stated reason.
-- Branch flow: feature branches → PR into `develop` → PR from `develop` into `main` to release. `main` is protected (PR required, no force-push or deletion, enforced for admins). Merge commits only; merge commits are titled with the PR title.
+- Branch flow: feature branches → PR into `develop` → PR from `develop` into `main` to release. `main` is protected (PR required, no force-push or deletion, enforced for admins). Merge commits only; merge commits are titled with the PR title. Copilot reviews the feature → `develop` PR only; a `develop` → `main` release PR gets no review, so merge it once CI is green instead of waiting.
 - When behavior changes, update `README.md`, `docs/ARCHITECTURE.md`, and (if user-facing) `docs/index.html` / `docs/llms.txt`.
 
 ## Verify
